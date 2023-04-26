@@ -94,13 +94,20 @@ int main() {
 		ureal t = (ureal)i / (ureal)babynum;//0.~less than 1.
 
 		//位置は
-		constexpr ureal spin = 7.5;//巻数
+		constexpr ureal spin = 10;//巻数
 		constexpr ureal len = 2.;//コイルの長さ
 		constexpr ureal pitch = len/spin;//一周したときに進む距離
 		const uvec3 org(0., 0., -1.);//開始位置
 		uvec3 babypos;
-		babypos.z() = spin * pitch * t;//tが1でspin回回ってる　つまりspin*pitch
-		cout << babypos.z() << endl;
+		babypos.z() = spin * pitch * [&]{
+			//二次関数的にplt
+			if (t < 0.5) {
+				return pow(t * 2., 2) / 2.;
+			}
+			else {
+				return -(pow((t-1.) * 2., 2) / 2.)+1.;
+			}
+		}();//tが1でspin回回ってる　つまりspin*pitch
 		//ここから半径を求められるでしょう? 球にフィッティングするように
 		ureal radius = sin(acos(babypos.z()-1.));
 		babypos.x() = radius * cos(2 * std::numbers::pi * t * spin);
