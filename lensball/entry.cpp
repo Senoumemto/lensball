@@ -71,18 +71,13 @@ void DrawSphere(uptr<matplotlib>& plt,uvec3 center,ureal r,int splitnum=10,const
 
 }
 
-int main() {
-
-	auto plotter = SetupPythonRuntime();//pythonをセットアップする
-	DefinePythonFunctions(plotter);//梅本的基本関数を定義
-
-	//まずガイド用の球を置く
-	//DrawSphere(plotter, uvec3(0, 0, 0.), 1., 25, R"("lightgreen")", 1.);
-
-
+uptr<std::list<std::pair<uvec3, ureal>>> CalcSmallLensPosAndRadius() {
 	//球を配列していく...
-	int babynum = 120;
-	for (decltype(babynum) i = 0; i < babynum; i++) {
+	constexpr unsigned int babynum = 400;
+	//球の座標と半径を入れる
+	auto smallBallsParams = make_unique<std::list<std::pair<uvec3, ureal>>>(babynum);
+	auto saved = smallBallsParams->begin();//計算したパラメータの保存先
+	for (unsigned int i = 0; i < babynum; i++) {
 		/*条件
 		球面上に中心が来るはず
 		ネジ状にちょっとずつずれるはず?*/
@@ -94,35 +89,52 @@ int main() {
 		ureal t = (ureal)i / (ureal)babynum;//0.~less than 1.
 
 		//位置は
-		constexpr ureal spin = 10;//巻数
+		constexpr ureal spin = 20;//巻数
 		constexpr ureal len = 2.;//コイルの長さ
-		constexpr ureal pitch = len/spin;//一周したときに進む距離
+		constexpr ureal pitch = len / spin;//一周したときに進む距離
 		const uvec3 org(0., 0., -1.);//開始位置
 		uvec3 babypos;
-		babypos.z() = spin * pitch * [&]{
+		babypos.z() = spin * pitch * [&] {
 			//二次関数的にplt
 			if (t < 0.5) {
 				return pow(t * 2., 2) / 2.;
 			}
 			else {
-				return -(pow((t-1.) * 2., 2) / 2.)+1.;
+				return -(pow((1 - t) * 2., 2) / 2.) + 1.;
 			}
 		}();//tが1でspin回回ってる　つまりspin*pitch
 		//ここから半径を求められるでしょう? 球にフィッティングするように
-		ureal radius = sin(acos(babypos.z()-1.));
+		ureal radius = sin(acos(babypos.z() - 1.));
 		babypos.x() = radius * cos(2 * std::numbers::pi * t * spin);
 		babypos.y() = radius * sin(2 * std::numbers::pi * t * spin);
 
 		//つぎに昇給の半径を求めたい まず一周する間に何個置かれるん？
 		ureal numOfSmallBallInCircle = (ureal)babynum / (ureal)spin;
 		//大球上の半径がわかるから円周を敷き詰めれるような大きさにする
-		ureal smallradius = 2 * std::numbers::pi * radius / numOfSmallBallInCircle / 2.;
-		//豆球の描画
-		DrawSphere(plotter, babypos + org, smallradius, 10);
+		constexpr ureal expandSmallBall = 1.25;//ちょっとみちみちてたほうがGoodなので小球を拡大する
+		ureal smallradius = 2 * std::numbers::pi * radius / numOfSmallBallInCircle / 2. * expandSmallBall;
+		//豆球の保存
+		saved.operator*() = make_pair(babypos + org, smallradius);
+		saved++;
 	}
 
-	plotter->show();
+	return smallBallsParams;
+}
 
+int main() {
+
+	auto plotter = SetupPythonRuntime();//pythonをセットアップする
+	DefinePythonFunctions(plotter);//梅本的基本関数を定義
+
+	
+	//レンズボールの要素レンズのパラメータを計算する
+	auto lensBallsParams = CalcSmallLensPosAndRadius();
+
+	//すべての玉を描画
+	for(const auto&param: *lensBallsParams)
+		DrawSphere(plotter,param.first,param.second, 10, R"("red")");
+
+	plotter->show();//表示　なんか終わらん
 	plotter->close();//終了　あんまり意味がない
 	return 0;
 }
