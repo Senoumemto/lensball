@@ -138,9 +138,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="entry.cpp" />
+    <ClCompile Include="application.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="application.h" />
+    <ClInclude Include="application.hpp" />
     <ClInclude Include="general.hpp" />
     <ClInclude Include="matplotwrapper.hpp" />
   </ItemGroup>

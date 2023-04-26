@@ -26,8 +26,11 @@
 #define COPY_BAN(objname) objname(const objname&)=delete; objname& operator=(const objname&)=delete
 
 using ureal = double;
+using index = int;
+
 using uvec6 = Eigen::Vector<ureal, 6>;
 
+template<size_t SIZ> using uvec = Eigen::Vector<ureal, SIZ>;
 using uvec1 = Eigen::Vector<ureal, 1>;
 using uvec2 = Eigen::Vector<ureal, 2>;
 using uvec3 = Eigen::Vector<ureal, 3>;
