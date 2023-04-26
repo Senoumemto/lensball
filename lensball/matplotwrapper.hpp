@@ -108,8 +108,11 @@ public:
 		send_command("plt.clf()");
 
 	}
-    void show(ureal interval=1./100.) {
-        send_command(StringFormat("plt.pause(%f)",interval).c_str());
+    void show() {
+        send_command("plt.show()");
+    }
+    void pause(ureal interval = 1. / 100.) {
+        send_command(StringFormat("plt.pause(%f)", interval).c_str());
     }
 };
 
