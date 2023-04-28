@@ -19,8 +19,9 @@
 #include <list>
 
 #include <Eigen/Core>
-#include <Eigen/LU>
-#include <Eigen/SVD>
+//#include <Eigen/LU>
+//#include <Eigen/SVD>
+#include <Eigen/Geometry>
 #include <numbers>
 
 #define COPY_BAN(objname) objname(const objname&)=delete; objname& operator=(const objname&)=delete
@@ -41,6 +42,8 @@ using umat4 = Eigen::Matrix4<ureal>;
 
 using uvecx = Eigen::VectorX<ureal>;
 using umatx = Eigen::MatrixX<ureal>;
+
+using uaffine3 = Eigen::Transform<ureal, 3, 2>;
 
 template<typename T>using sptr = std::shared_ptr<T>;
 template<typename T>using uptr = std::unique_ptr<T>;

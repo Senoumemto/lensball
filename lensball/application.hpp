@@ -90,6 +90,7 @@ template<size_t SIZ>ray<SIZ> FreeFlightRay(ray<SIZ>& target, ureal time = 10.) {
 
 //’¼ü‚ğ•`‰æ
 void DrawRay(uptr<matplotlib>& plt, const ray3& target, const std::string& color = R"("red")");
+void DrawRaySkipFirstArrow(uptr<matplotlib>& plt, const ray3& target, const std::string& color = R"("red")");
 
 //‹…‚Æarrow‚ÌŒğ·”»’è
 struct resultIntersecteSphere {
@@ -97,10 +98,11 @@ struct resultIntersecteSphere {
 
 	uvec3 pos;
 	uvec3 norm;
+	ureal t;//”»’è‚ğs‚Á‚½arrow‚Å‚Ìt
 
 	resultIntersecteSphere();
-	resultIntersecteSphere(const uvec3& pos, const uvec3& norm);
-	ray3& ApplyToRay(ray3& target);
+	resultIntersecteSphere(const uvec3& pos, const uvec3& norm,const ureal t);
+	ray3& ApplyToRay(ray3& target)const;
 };
 resultIntersecteSphere IntersectSphere(const arrow3& rayback, const uvec3& c, const ureal r);
 

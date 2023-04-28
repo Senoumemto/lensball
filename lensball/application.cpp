@@ -110,7 +110,7 @@ uptr<std::list<sphereParam>> CalcSmallLensPosAndRadius() {
 		//つぎに昇給の半径を求めたい まず一周する間に何個置かれるん？
 		ureal numOfSmallBallInCircle = (ureal)babynum / (ureal)spin;
 		//大球上の半径がわかるから円周を敷き詰めれるような大きさにする
-		constexpr ureal expandSmallBall = 1.0;//ちょっとみちみちてたほうがGoodなので小球を拡大する
+		constexpr ureal expandSmallBall = 1.5;//ちょっとみちみちてたほうがGoodなので小球を拡大する
 		ureal smallradius = 2 * std::numbers::pi * radius / numOfSmallBallInCircle / 2. * expandSmallBall;
 		//豆球の保存
 		saved.operator*() = make_pair(babypos + org, smallradius);
@@ -127,6 +127,20 @@ void DrawLine(uptr<matplotlib>& plt, const uvec3& a, const uvec3& b, const std::
 void DrawRay(uptr<matplotlib>& plt, const ray3& target, const std::string& color) {
 	//ターゲットの間を計算する
 	auto first = target.begin();
+
+	while (1) {
+		//先の終点を計算する
+		auto second = std::next(first);
+		if (second == target.end())break;
+
+		DrawLine(plt, first->org(), second->org(), color);
+		first = second;
+	}
+}
+void DrawRaySkipFirstArrow(uptr<matplotlib>& plt, const ray3& target, const std::string& color) {
+	//ターゲットの間を計算する
+	auto first = target.begin();
+	first++;
 
 	while (1) {
 		//先の終点を計算する
@@ -166,7 +180,7 @@ resultIntersecteSphere IntersectSphere(const arrow3& rayback, const uvec3& c, co
 		//交点の法線を求める
 		const uvec3 norm = (kai - c).normalized();
 
-		return resultIntersecteSphere(kai, norm);
+		return resultIntersecteSphere(kai, norm, t);
 	}
 	//交差しなかったら
 	else {
@@ -177,12 +191,13 @@ resultIntersecteSphere IntersectSphere(const arrow3& rayback, const uvec3& c, co
 resultIntersecteSphere::resultIntersecteSphere() {
 	this->isHit = false;
 }
-resultIntersecteSphere::resultIntersecteSphere(const uvec3& pos, const uvec3& norm) {
+resultIntersecteSphere::resultIntersecteSphere(const uvec3& pos, const uvec3& norm,const ureal t) {
 	this->isHit = true;
 	this->pos = pos;
 	this->norm = norm;
+	this->t = t;
 }
-ray3& resultIntersecteSphere::ApplyToRay(ray3& target) {
+ray3& resultIntersecteSphere::ApplyToRay(ray3& target) const{
 	if (!this->isHit)return target;
 	//新たな点
 	arrow3 newone = target.back();
