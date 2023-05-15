@@ -18,9 +18,9 @@ ax.set_xlabel("x", fontsize = 16)
 ax.set_ylabel("y", fontsize = 16)
 ax.set_zlabel("z", fontsize = 16)
 # ²”ÍˆÍ‚Ìİ’è
-ax.set_xlim(-1.5, 1.5)
-ax.set_ylim(-1.5, 1.5)
-ax.set_zlim(-1.5, 1.5))");
+ax.set_xlim(-3.,3.)
+ax.set_ylim(-3.,3.)
+ax.set_zlim(-3.,3.))");
 
 	return ret;
 }
@@ -140,7 +140,7 @@ void DrawRay(uptr<matplotlib>& plt, const ray3& target, const std::string& color
 void DrawRaySkipFirstArrow(uptr<matplotlib>& plt, const ray3& target, const std::string& color) {
 	//ƒ^[ƒQƒbƒg‚ÌŠÔ‚ğŒvZ‚·‚é
 	auto first = target.begin();
-	first++;
+	//first++;
 
 	while (1) {
 		//æ‚ÌI“_‚ğŒvZ‚·‚é
@@ -215,4 +215,32 @@ ray3& ReflectMirror(ray3& target, const uvec3& norm) {
 
 	target.push_back(newone);
 	return target;
+}
+
+//‹üÜ‚·‚é
+bool RefractSnell(ray3& target, const uvec3& norm, const ureal eta) {
+	const auto& ins = target.back();//“üËŒõ
+	const auto theta = acos(norm.dot(-ins.dir()));//“üËŠp
+
+	//—ÕŠEŠp‚©‚Ç‚¤‚©”»’è‚·‚é
+	if (sin(theta) / eta > 1.) {
+		//—ÕŠEŠp‚È‚Ì‚Å‹üÜ‚Í‚µ‚È‚¢
+		return false;
+	}
+
+	const auto phi = asin(sin(theta) / eta);//oËŠp
+
+	ureal alpha;
+	//oËŠp‚ª0‚Å‚È‚¯‚ê‚Î=sin(phi)‚ª0‚Å‚È‚¯‚ê‚Î
+	if (sin(phi) != 0.)
+		alpha = sin(theta - phi) / sin(phi);
+	else
+		alpha = 0.;
+
+	//‚Â‚Ü‚èoË•ûŒü‚Í(alpha‚ª0‚È‚ç‹üÜ‚µ‚È‚¢‚Á‚Ä‚±‚Æ)
+	const uvec3 e = ins.dir() - alpha * norm;
+
+	//’Ç‰Á‚µ‚ÄI‚í‚è
+	target.push_back(arrow3(ins.org(), e.normalized()));
+	return true;
 }

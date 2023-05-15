@@ -108,3 +108,5 @@ resultIntersecteSphere IntersectSphere(const arrow3& rayback, const uvec3& c, co
 
 //‹¾–Ê”½Ë‚·‚é
 ray3& ReflectMirror(ray3& target, const uvec3& norm);
+//‹üÜ‚·‚é
+bool RefractSnell(ray3& target, const uvec3& norm, const ureal eta);
