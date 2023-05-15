@@ -6,20 +6,30 @@
 using namespace std;
 
 int main() {
+	/*
+	レンズを動かして、光の散り方を知りたい
+	レンズの動きxを軸にとってdirのx,yをプロット
+	**********y
+	入射光の方向を法線からずらして行う
+	
+	
+	*/
 
-	printf("hello v1234\n");
+	printf("hello v1235\n");
 
 	auto plotter = SetupPythonRuntime();//pythonをセットアップする
 	DefinePythonFunctions(plotter);//梅本的基本関数を定義
 
 	//要素レンズを定義　旧レンズに
 	const ureal nodeLensEta = 1.5;
-	const sphereParam nodeLensParam = make_pair(uvec3(0., 0., 0.), 1.);
+	sphereParam nodeLensParam = make_pair(uvec3(-0.2, -0.2, 0.), 1.);
 
 	//レイを生成する
 	list<ray3> rays;
-	rays.push_back(ray3(arrow3(uvec3(0.25,0.,10.),uvec3(0.,0.,-1.))));//初期位置を作る
-	rays.push_back(ray3(arrow3(uvec3(-0.25, 0., 10.), uvec3(0., 0., -1.))));//初期位置を作る
+	//レンズをずらしならがおんなじレイを当てる
+	for(int i=0;i<25;i++)
+		rays.push_back(ray3(arrow3(uvec3(0.0,0.,10.),uvec3(0.,0.,-1.))));//初期位置を作る
+	int counter = 0;//これをレンズの位置を変えるフラグにする
 	for (ray3& target : rays) {
 		//レイトレパイプライン
 		[&] {
@@ -42,15 +52,25 @@ int main() {
 			if (!RefractSnell(target, -rez1.norm, 1. / nodeLensEta))throw runtime_error("全反射が起きた");//屈折計算
 
 			FreeFlightRay(target);
+			cout << nodeLensParam.first << "\n\n" << endl;
+			nodeLensParam.first = nodeLensParam.first+uvec3(0.1, 0., 0.);
 
+			counter++;
+			if (counter % 5 == 0) {
+				nodeLensParam.first.x() = -0.2;
+				nodeLensParam.first += uvec3(0., 0.1, 0.);
+			}
 		}();
 	}
 
 	//要素レンズを描画
-	DrawSphere(plotter, nodeLensParam.first, nodeLensParam.second, 10, R"("red")");
+	//DrawSphere(plotter, nodeLensParam.first, nodeLensParam.second, 10, R"("red")");
 	//すべてのレイを描画
-	for(const auto&r:rays)
+	for (const auto& r : rays) {
 		DrawRaySkipFirstArrow(plotter, r, R"("green")");//レイを描画
+		//レイの方向を表示
+		//cout <<"dir:\n" << r.back().dir() <<"\n\n" << endl;
+	}
 
 	plotter->show();//表示　なんか終わらん
 	plotter->close();//終了　あんまり意味がない
