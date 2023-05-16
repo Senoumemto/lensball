@@ -28,7 +28,8 @@ int main() {
 	list<ray3> rays;
 	//レンズをずらしならがおんなじレイを当てる
 	for(int i=0;i<25;i++)
-		rays.push_back(ray3(arrow3(uvec3(0.0,0.,10.),uvec3(0.,0.,-1.))));//初期位置を作る
+		//rays.push_back(ray3(arrow3(uvec3(0., 0., 10.), uvec3(0.,0., -1.).normalized())));//初期位置を作る
+		rays.push_back(ray3(arrow3(uvec3(-5.0,-5.0,10.),uvec3(0.5,0.5,-1.).normalized())));//初期位置を作る
 	int counter = 0;//これをレンズの位置を変えるフラグにする
 	for (ray3& target : rays) {
 		//レイトレパイプライン
@@ -66,8 +67,10 @@ int main() {
 	//要素レンズを描画
 	//DrawSphere(plotter, nodeLensParam.first, nodeLensParam.second, 10, R"("red")");
 	//すべてのレイを描画
+	const array<string,5> cols = { "\"red\"","\"orange\"","\"yellow\"","\"green\"","\"blue\"" };
+	counter = 0;
 	for (const auto& r : rays) {
-		DrawRaySkipFirstArrow(plotter, r, R"("green")");//レイを描画
+		DrawRaySkipFirstArrow(plotter, r, cols[counter++/5]);//レイを描画
 		//レイの方向を表示
 		//cout <<"dir:\n" << r.back().dir() <<"\n\n" << endl;
 	}
