@@ -220,7 +220,8 @@ ray3& ReflectMirror(ray3& target, const uvec3& norm) {
 //‹üÜ‚·‚é
 bool RefractSnell(ray3& target, const uvec3& norm, const ureal eta) {
 	const auto& ins = target.back();//“üËŒõ
-	const auto theta = acos(norm.dot(-ins.dir()));//“üËŠp
+	cout << (norm.dot(-ins.dir())) << endl;
+	const auto theta = acos(clamp(norm.dot(-ins.dir()),-1.,1.));//“üËŠp
 
 	//—ÕŠEŠp‚©‚Ç‚¤‚©”»’è‚·‚é
 	if (sin(theta) / eta > 1.) {

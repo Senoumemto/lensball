@@ -22,14 +22,14 @@ int main() {
 
 	//要素レンズを定義　旧レンズに
 	const ureal nodeLensEta = 1.5;
-	sphereParam nodeLensParam = make_pair(uvec3(-0.2, -0.2, 0.), 1.);
+	sphereParam nodeLensParam = make_pair(uvec3(0.,0., 0.), 1.);
 
 	//レイを生成する
 	list<ray3> rays;
 	//レンズをずらしならがおんなじレイを当てる
-	for(int i=0;i<25;i++)
-		//rays.push_back(ray3(arrow3(uvec3(0., 0., 10.), uvec3(0.,0., -1.).normalized())));//初期位置を作る
-		rays.push_back(ray3(arrow3(uvec3(-5.0,-5.0,10.),uvec3(0.5,0.5,-1.).normalized())));//初期位置を作る
+	rays.push_back(ray3(arrow3(uvec3(1+0.5,0.,10.),uvec3(-0.1,0.,-1.).normalized())));//初期位置を作る
+	rays.push_back(ray3(arrow3(uvec3(-(1 + 0.5), 0., 10.), uvec3(0.1, 0., -1.).normalized())));//初期位置を作る
+	//rays.push_back(ray3(arrow3(uvec3(-10, 0., 10.), uvec3(-1., 0., -1.).normalized())));//初期位置を作る
 	int counter = 0;//これをレンズの位置を変えるフラグにする
 	for (ray3& target : rays) {
 		//レイトレパイプライン
@@ -54,18 +54,13 @@ int main() {
 
 			FreeFlightRay(target);
 			cout << nodeLensParam.first << "\n\n" << endl;
-			nodeLensParam.first = nodeLensParam.first+uvec3(0.1, 0., 0.);
 
-			counter++;
-			if (counter % 5 == 0) {
-				nodeLensParam.first.x() = -0.2;
-				nodeLensParam.first += uvec3(0., 0.1, 0.);
-			}
+			
 		}();
 	}
 
 	//要素レンズを描画
-	//DrawSphere(plotter, nodeLensParam.first, nodeLensParam.second, 10, R"("red")");
+	DrawSphere(plotter, nodeLensParam.first, nodeLensParam.second, 10, R"("red")");
 	//すべてのレイを描画
 	const array<string,5> cols = { "\"red\"","\"orange\"","\"yellow\"","\"green\"","\"blue\"" };
 	counter = 0;
