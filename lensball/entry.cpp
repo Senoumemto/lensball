@@ -22,13 +22,23 @@ int main() {
 
 	//要素レンズを定義　旧レンズに
 	const ureal nodeLensEta = 1.5;
-	sphereParam nodeLensParam = make_pair(uvec3(0.,0., 0.), 1.);
+	sphereParam nodeLensParam = make_pair(uvec3(100.,0., 0.), 1.);
 
 	//レイを生成する
 	list<ray3> rays;
-	//レンズをずらしならがおんなじレイを当てる
-	rays.push_back(ray3(arrow3(uvec3(0.66, 0., 10.), uvec3(0., 0., -1.).normalized())));//初期位置を作る
-	int counter = 0;//これをレンズの位置を変えるフラグにする
+	constexpr unsigned int raynum = 18;
+	constexpr ureal projectionLimit = 30. / 180. * std::numbers::pi;//片側角度
+	const uvec3 projectionOrign(0., 0., 0.);
+	for (std::decay<decltype(raynum)>::type i = 0; i < raynum; i++) {
+		//値を正規化する-1~1
+		const ureal reg = 2. * (i / (ureal)(raynum - 1)) - 1.;
+		//それを角度にする
+		const ureal angle = reg * projectionLimit;//鉛直からの角度
+
+		//つまり向きが決まる x,y平面でy軸方向をzeroにangleだけ角度を決める
+		const uvec3 direction(sin(angle), cos(angle), 0.);
+		rays.push_back(ray3(arrow3(projectionOrign, direction)));//レイを作成
+	}
 	for (ray3& target : rays) {
 		//レイトレパイプライン
 		[&] {
@@ -69,9 +79,8 @@ int main() {
 	//DrawSphere(plotter, nodeLensParam.first, nodeLensParam.second, 10, R"("red")");
 	//すべてのレイを描画
 	const array<string,5> cols = { "\"red\"","\"orange\"","\"yellow\"","\"green\"","\"blue\"" };
-	counter = 0;
 	for (const auto& r : rays) {
-		DrawRaySkipFirstArrow(plotter, r, cols[counter++/5]);//レイを描画
+		DrawRaySkipFirstArrow(plotter, r, "\"red\"");//レイを描画
 		//レイの方向を表示
 		cout <<"dir:\n" << r.back().dir() <<"\n\n" << endl;
 		//角度を計算する
