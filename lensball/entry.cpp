@@ -40,7 +40,7 @@ int main() {
 	}
 	//レイを生成する
 	list<ray3> rays;
-	constexpr unsigned int targetBallsNum = 4;//光を当てるボールの数v ただしnodelensNumが偶数だったら偶数、奇数だったら奇数にすること
+	constexpr unsigned int targetBallsNum = 8;//光を当てるボールの数v ただしnodelensNumが偶数だったら偶数、奇数だったら奇数にすること
 	constexpr unsigned int targetBallsOffset = ((nodeLensNum % 2) != (targetBallsNum % 2)) ? 0 : (nodeLensNum - targetBallsNum) / 2;
 	const uvec3 projectionOrign(0., 0., 0.);
 	constexpr ureal layAngleLimitFromTarget = 5. / 180. * std::numbers::pi;
@@ -63,23 +63,33 @@ int main() {
 		//レイトレパイプライン
 		[&] {
 			try {
-				const auto rez0 = IntersectSphere(target.back(), nodeLensesParams.front().first, nodeLensesParams.front().second);//要素レンズと交差
+				//すべての要素レンズに対して当たり判定を行う これで交差するレンズを探す
+				auto hittedNode = nodeLensesParams.end();
+				resultIntersecteSphere rezIns;//入社時の交差結果
+				for (auto i = nodeLensesParams.begin(); i != nodeLensesParams.end();i++) {
+					const auto rez0 = IntersectSphere(target.back(), i->first, i->second);//要素レンズと交差
+					if (rez0.isHit) {//当たったら終わり
+						hittedNode = i;
+						rezIns = rez0;
+						break;
+					}
+				}
 
 				//当たらなかったらこれ以上やる必要はない
-				if (!rez0.isHit) {
+				if (hittedNode==nodeLensesParams.end()) {
 					FreeFlightRay(target);
 					return;
 				}
 
 				//ここからレンズ内の処理
-				rez0.ApplyToRay(target);
-				if (!RefractSnell(target, rez0.norm, nodeLensEta))throw runtime_error("全反射が起きた");//屈折計算
+				rezIns.ApplyToRay(target);
+				if (!RefractSnell(target, rezIns.norm, nodeLensEta))throw runtime_error("全反射が起きた");//屈折計算
 
-				const auto rez1 = IntersectSphere(target.back(), nodeLensesParams.front().first, nodeLensesParams.front().second);//要素レンズ内部を通過
-				if (!rez1.isHit)throw logic_error("logic err0");//レンズ内部なので絶対当たる
-				rez1.ApplyToRay(target);//進める
+				const auto rezExp = IntersectSphere(target.back(), hittedNode->first, hittedNode->second);//要素レンズ内部を通過
+				if (!rezExp.isHit)throw logic_error("logic err0");//レンズ内部なので絶対当たる
+				rezExp.ApplyToRay(target);//進める
 
-				if (!RefractSnell(target, -rez1.norm, 1. / nodeLensEta))throw runtime_error("全反射が起きた");//屈折計算
+				if (!RefractSnell(target, -rezExp.norm, 1. / nodeLensEta))throw runtime_error("全反射が起きた");//屈折計算
 
 				FreeFlightRay(target);
 			}
