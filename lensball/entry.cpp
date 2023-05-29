@@ -121,7 +121,7 @@ int MMain() {
 					if (!RefractSnell(target, -rezExp.norm, 1. / nodeLensEta))throw logic_error("‘S”½Ë‚ª‹N‚«‚½");//‹üÜŒvZ
 
 					//‚±‚±‚Å•â•ü‚ğ‘‚­‚©‚Ç‚¤‚©Œˆ‚ß‚é
-					if (true/*rayTracingCount % 3 != 1*/) auxTarget.push_back(--target.end());
+					if (rayTracingCount % 3 != 0) auxTarget.push_back(--target.end());
 
 					FreeFlightRay(target);
 				}
