@@ -40,7 +40,7 @@ int main() {
 	}
 	//レイを生成する
 	list<ray3> rays;
-	constexpr unsigned int targetBallsNum = 8;//光を当てるボールの数v ただしnodelensNumが偶数だったら偶数、奇数だったら奇数にすること
+	constexpr unsigned int targetBallsNum = 6;//光を当てるボールの数v ただしnodelensNumが偶数だったら偶数、奇数だったら奇数にすること
 	constexpr unsigned int targetBallsOffset = ((nodeLensNum % 2) != (targetBallsNum % 2)) ? 0 : (nodeLensNum - targetBallsNum) / 2;
 	const uvec3 projectionOrign(0., 0., 0.);
 	constexpr ureal layAngleLimitFromTarget = 5. / 180. * std::numbers::pi;
@@ -130,6 +130,12 @@ int main() {
 	for (const auto& i : nodeLensesParams)
 		DrawSphere(plotter, i.first, i.second, 20, R"("green")");
 	//プロジェクタの最大投映角を
+	constexpr ureal projectorLimitAngle = 60. / 180. * std::numbers::pi;//プロジェクタの投映範囲　片側
+	constexpr ureal auxProjectorLimitLineLength = 10.;//補助線長さ
+	DrawLine(plotter, projectionOrign, projectionOrign + uvec3(sin(projectorLimitAngle), cos(projectorLimitAngle), 0.) * auxProjectorLimitLineLength, R"("blue")");
+	DrawLine(plotter, projectionOrign, projectionOrign + uvec3(sin(-projectorLimitAngle), cos(-projectorLimitAngle), 0.) * auxProjectorLimitLineLength, R"("blue")");
+
+
 	//表示領域のための補助線
 	constexpr ureal auxLineLength = 10.;
 	for (const auto& t : auxTarget) {
