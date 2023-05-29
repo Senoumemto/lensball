@@ -58,29 +58,30 @@ int MMain() {
 		}
 		
 	//次に極を傾ける
-	const auto tiltOfPoll = Eigen::AngleAxis<ureal>(7.5 / 180. * std::numbers::pi, uvec3(0., 1., 0.));
+	const auto tiltOfPoll = Eigen::AngleAxis<ureal>(15. / 180. * std::numbers::pi, uvec3(0., 1., 0.));
 	for (auto& p : uvPoses)p = tiltOfPoll * p;
+
+	//つぎにレイを当ててマッピングしたいので当てるレイを定義する
+	const arrow3 mapRay = arrow3(uvec3(0., -5., 0.), uvec3(0., 1., 0.));
+	std::list<uvec3> mappingList;
 
 	//まわす
 	constexpr size_t rotationResolution = 60;
-	for (std::decay<decltype(rotationResolution)>::type rotIndex = 0; rotIndex < rotationResolution; rotIndex++) {
-		const ureal rotAngle = uleap(make_pair(-std::numbers::pi, +std::numbers::pi), rotIndex / (ureal)rotationResolution);//正規化　ループなことに注意
-		const Eigen::AngleAxis<ureal> rotMat = Eigen::AngleAxis<ureal>(rotAngle, uvec3(0., 0., 1.));
+	for (int xx = 0; xx < 2; xx++) {
+		for (std::decay<decltype(rotationResolution)>::type rotIndex = 0; rotIndex < rotationResolution; rotIndex++) {
+			const ureal rotAngle = uleap(make_pair(-std::numbers::pi, +std::numbers::pi), rotIndex / (ureal)rotationResolution);//正規化　ループなことに注意
+			const Eigen::AngleAxis<ureal> rotMat = Eigen::AngleAxis<ureal>(rotAngle, uvec3(0., 0., 1.));
 
-		//Start drawing
-		plotter->send_command("ax.view_init(elev=0\n)");//視点を設定
-		//Draw uv vertices
-		for (auto p : uvPoses) {
-			p = rotMat * p;
-			plotter->send_command(StringFormat("ax.scatter(%f,%f,%f)\n", p.x(), p.y(), p.z()));
-		}
+			//マッピングする もちろん今のローカル変換も含めてね
+			const auto rez = IntersectSphere(mapRay, centerUVSphereParam.first, centerUVSphereParam.second);
+			if (!rez.isHit)throw logic_error("dameda");
+			cout << rez.pos << endl;
+			mappingList.push_back(rotMat * rez.pos);
 
-		//結果を保存
-		const std::string resultsPathPrefix = R"(C:/local/user/lensball/lensball/results2/)";
-		plotter->save(resultsPathPrefix + StringFormat("rez%d.png", rotIndex));
-		plotter->pause();
-		//フレームクリア
-		plotter->send_command(R"(
+
+
+			//フレームクリア
+			plotter->send_command(R"(
 plt.cla()
 #ax = fig.add_subplot(111, projection = '3d')
 ax.set_box_aspect((1, 1, 1))
@@ -92,9 +93,33 @@ ax.set_zlabel("z", fontsize = 16)
 ax.set_xlim(-3.,3.)
 ax.set_ylim(-3.,3.)
 ax.set_zlim(-3.,3.))");
-	}
-	
+			//Start drawing
+			plotter->send_command("ax.view_init(elev=0\n)");//視点を設定
 
+			//マッピング線を書く
+			plotter->send_command("x=[]\ny=[]\nz=[]\n");
+			for (const auto& p : mappingList) {
+				plotter->send_command(StringFormat(""
+					"x.append(%f)\n"
+					"y.append(%f)\n"
+					"z.append(%f)\n"
+					"\n", p.x(), p.y(), p.z()));
+			}
+			plotter->send_command("ax.plot(x,y,z,color=\"red\")\n");
+
+			//Draw uv vertices
+			for (auto p : uvPoses) {
+				p = rotMat * p;
+				plotter->send_command(StringFormat("ax.scatter(%f,%f,%f)\n", p.x(), p.y(), p.z()));
+			}
+
+			//結果を保存
+			const std::string resultsPathPrefix = R"(C:/local/user/lensball/lensball/results2/)";
+			plotter->save(resultsPathPrefix + StringFormat("rez%d.png", rotIndex));
+			plotter->pause();
+		}
+	}
+	plotter->show();
 	plotter->send_command("plt.cla()\nplt.clf()\n");//pyplot終了ポリシー
 	plotter->close();
 	return 0;
