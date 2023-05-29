@@ -147,6 +147,15 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="results\rez0.png" />
+    <Image Include="results\rez1.png" />
+    <Image Include="results\rez2.png" />
+    <Image Include="results\rez3.png" />
+    <Image Include="results\rez4.png" />
+    <Image Include="results\rez5.png" />
+    <Image Include="results\rez6.png" />
+    <Image Include="results\rez7.png" />
+    <Image Include="results\rez8.png" />
+    <Image Include="results\rez9.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
