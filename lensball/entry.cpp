@@ -5,7 +5,23 @@
 
 using namespace std;
 
+int MMain();
+
 int main() {
+	try {
+		return MMain();
+	}
+	catch (std::exception& ex) {
+		cout << ex.what() << endl;
+		return -1;
+	}
+	catch (...) {
+		cout << "unknown err" << endl;
+		return -2;
+	}
+}
+
+int MMain() {
 	/*
 	レンズを動かして、光の散り方を知りたい
 	レンズの動きxを軸にとってdirのx,yをプロット
@@ -40,7 +56,7 @@ int main() {
 
 	//orgのyをちょっとずつ換えてく
 	constexpr size_t numProjectorOrignResolution = 10;
-	const std::pair<ureal, ureal> projectorOrgYRange = make_pair<ureal, ureal>(0., 0.1);
+	const std::pair<ureal, ureal> projectorOrgYRange = make_pair<ureal, ureal>(-0.7, 0.3);
 	for (std::decay<decltype(numProjectorOrignResolution)>::type indexOrgPos = 0; indexOrgPos < numProjectorOrignResolution; indexOrgPos++) {
 
 		//レイを生成する
