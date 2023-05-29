@@ -110,6 +110,11 @@ template<typename T>uvec2 ReshapeXY(const T& gen) {
 	return uvec2(gen.x(), gen.y());
 }
 
+//üŒ`•âŠÔ‚·‚é
+template<typename T>T uleap(const std::pair<T,T>& range,const T& t) {
+	return range.first + (range.second - range.first) * t;
+}
+
 
 namespace std {
 	template <typename Scalar, int Rows, int Cols>

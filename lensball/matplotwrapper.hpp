@@ -104,6 +104,9 @@ public:
 	void send_command(const char* s) const {
 		PyRun_SimpleString(s);
 	}
+    void send_command(const std::string& s) const {
+        this->send_command(s.c_str());
+    }
     void send_import(const char* s) const {
         PyImport_AddModule(s);
     }
