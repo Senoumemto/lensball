@@ -42,7 +42,7 @@ int main() {
 	list<ray3> rays;
 	constexpr unsigned int targetBallsNum = 6;//光を当てるボールの数v ただしnodelensNumが偶数だったら偶数、奇数だったら奇数にすること
 	constexpr unsigned int targetBallsOffset = ((nodeLensNum % 2) != (targetBallsNum % 2)) ? 0 : (nodeLensNum - targetBallsNum) / 2;
-	const uvec3 projectionOrign(0., 0., 0.);
+	const uvec3 projectionOrign(0., .0, 0.);
 	constexpr ureal layAngleLimitFromTarget = 5. / 180. * std::numbers::pi;
 	auto ite=nodeLensesParams.begin();
 	for (int i = 0; i < targetBallsOffset; i++)ite++;
@@ -144,7 +144,11 @@ int main() {
 
 	}
 
-	plotter->show();//表示　なんか終わらん
+	//結果を保存
+	const std::string resultsPathPrefix = R"(C:/local/user/lensball/lensball/results/)";
+	plotter->save(resultsPathPrefix + "rez0.png");
+	plotter->pause(1.);//表示　なんか終わらん
+	plotter->send_command("plt.cla()\nplt.clf()\n");//pyplot終了ポリシー
 	plotter->close();//終了　あんまり意味がない
 	return 0;
 }

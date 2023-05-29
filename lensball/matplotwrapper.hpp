@@ -93,9 +93,13 @@ public:
         line(uvec2(b.x(), b.y()), uvec2(e.x(), e.y()), color);
     }
 
+
 	void save(const char* filename) const {
-		send_command(StringFormat("\n", filename).c_str());
+		send_command(StringFormat("plt.savefig(\"%s\")\n", filename).c_str());
 	}
+    void save(const std::string& filename) const {
+        this->save(filename.c_str());
+    }
 
 	void send_command(const char* s) const {
 		PyRun_SimpleString(s);
