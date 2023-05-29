@@ -59,10 +59,16 @@ int main() {
 
 		ite++;
 	}
+
+
+	//レイトレパイプライン
+	std::list<decltype(rays)::value_type::iterator> auxTarget;//補助線を書くためのarrowをここに突っ込む
+	int rayTracingCount = -1;//いま処理されているのは何本目のレイか
 	for (ray3& target : rays) {
-		//レイトレパイプライン
 		[&] {
 			try {
+				rayTracingCount++;
+
 				//すべての要素レンズに対して当たり判定を行う これで交差するレンズを探す
 				auto hittedNode = nodeLensesParams.end();
 				resultIntersecteSphere rezIns;//入社時の交差結果
@@ -91,6 +97,9 @@ int main() {
 
 				if (!RefractSnell(target, -rezExp.norm, 1. / nodeLensEta))throw runtime_error("全反射が起きた");//屈折計算
 
+				//ここで補助線を書くかどうか決める
+				if (true/*rayTracingCount % 3 != 1*/) auxTarget.push_back(--target.end());
+
 				FreeFlightRay(target);
 			}
 			catch (std::exception& ex) {
@@ -105,9 +114,6 @@ int main() {
 		}();
 	}
 
-	//要素レンズを描画
-	for (const auto& i : nodeLensesParams)
-		DrawSphere(plotter, i.first, i.second, 20, R"("green")");
 	//すべてのレイを描画
 	const array<string,5> cols = { "\"red\"","\"orange\"","\"yellow\"","\"green\"","\"blue\"" };
 	for (const auto& r : rays) {
@@ -117,6 +123,19 @@ int main() {
 		//角度を計算する
 		const ureal angleax = atan(r.back().dir().x() / r.back().dir().z()) / std::numbers::pi * 180.;
 		cout << "angle: " << angleax << endl;
+	}
+
+	//つぎに作図する
+	//要素レンズを描画
+	for (const auto& i : nodeLensesParams)
+		DrawSphere(plotter, i.first, i.second, 20, R"("green")");
+	//プロジェクタの最大投映角を
+	//表示領域のための補助線
+	constexpr ureal auxLineLength = 10.;
+	for (const auto& t : auxTarget) {
+		//arrowをマイナス方向へ延長した線を作る
+		DrawLine(plotter, t->org(), t->org() - (auxLineLength * t->dir()), R"("green")");
+
 	}
 
 	plotter->show();//表示　なんか終わらん
