@@ -67,7 +67,7 @@ int MMain() {
 
 	//まわす
 	constexpr size_t rotationResolution = 60;
-	for (int xx = 0; xx < 2; xx++) {
+	for (int xx = 0; xx < 1; xx++) {
 		for (std::decay<decltype(rotationResolution)>::type rotIndex = 0; rotIndex < rotationResolution; rotIndex++) {
 			const ureal rotAngle = uleap(make_pair(-std::numbers::pi, +std::numbers::pi), rotIndex / (ureal)rotationResolution);//正規化　ループなことに注意
 			const Eigen::AngleAxis<ureal> rotMat = Eigen::AngleAxis<ureal>(rotAngle, uvec3(0., 0., 1.));
@@ -97,15 +97,17 @@ ax.set_zlim(-3.,3.))");
 			plotter->send_command("ax.view_init(elev=0\n)");//視点を設定
 
 			//マッピング線を書く
-			plotter->send_command("x=[]\ny=[]\nz=[]\n");
-			for (const auto& p : mappingList) {
-				plotter->send_command(StringFormat(""
-					"x.append(%f)\n"
-					"y.append(%f)\n"
-					"z.append(%f)\n"
-					"\n", p.x(), p.y(), p.z()));
+			if (false) {
+				plotter->send_command("x=[]\ny=[]\nz=[]\n");
+				for (const auto& p : mappingList) {
+					plotter->send_command(StringFormat(""
+						"x.append(%f)\n"
+						"y.append(%f)\n"
+						"z.append(%f)\n"
+						"\n", p.x(), p.y(), p.z()));
+				}
+				plotter->send_command("ax.plot(x,y,z,color=\"red\")\n");
 			}
-			plotter->send_command("ax.plot(x,y,z,color=\"red\")\n");
 
 			//Draw uv vertices
 			for (auto p : uvPoses) {
