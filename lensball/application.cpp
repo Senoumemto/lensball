@@ -16,7 +16,11 @@ ax.set_box_aspect((1, 1, 1))
 # ²ƒ‰ƒxƒ‹‚Ìİ’è
 ax.set_xlabel("x", fontsize = 16)
 ax.set_ylabel("y", fontsize = 16)
-ax.set_zlabel("z", fontsize = 16))");
+ax.set_zlabel("z", fontsize = 16)
+# ²”ÍˆÍ‚Ìİ’è
+ax.set_xlim(-3.,3.)
+ax.set_ylim(-3.,3.)
+ax.set_zlim(-3.,3.))");
 
 	return ret;
 }
