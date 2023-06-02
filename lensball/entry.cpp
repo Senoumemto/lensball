@@ -49,7 +49,7 @@ int main() {
 				const ureal t = uleap(std::make_pair(-std::numbers::pi, +std::numbers::pi), phi / (ureal)circleRes);//tを計算
 
 				const auto scanUV = ScanPointWithGh(t, scanHeight, theta);//UV座標ゲット UV球ローカル
-				const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPathCross);//レンズパスからの高さ UV球ローカル
+				const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPath);//レンズパスからの高さ UV球ローカル
 				//...これを直線にしなきゃいけない　
 
 				plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\n", t, scanHFromLensesPath, scanUV.x()));
@@ -61,7 +61,7 @@ int main() {
 			plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"UV coordition\")\n");
 			plotter->send_command("plt.legend()\n");
 			plotter->pause(.1);
-			plotter->save(StringFormat("C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPathEvened/rez%d.png",h));
+			plotter->save(StringFormat("C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPath/rez%d.png",h));
 		}
 	}
 	catch (std::exception& ex) {
