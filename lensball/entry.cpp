@@ -6,7 +6,7 @@
 using namespace std;
 
 constexpr ureal theta = 30. / 180. * std::numbers::pi;//こんだけ傾ける
-const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.8,0.8);
+const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.5,0.5);
 
 //ローカルから見たスキャン位置　t 回転角度,gh スキャンラインの高さ(グローバル)　theta ローカルの傾き
 uvec2 ScanPointWithGh(ureal t,ureal gh,ureal theta) {
@@ -61,7 +61,7 @@ int main() {
 			plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"UV coordition\")\n");
 			plotter->send_command("plt.legend()\n");
 			plotter->pause(.1);
-			plotter->save(StringFormat("C:/local/user/lensball/lensball/results3/rez%d.png",h));
+			plotter->save(StringFormat("C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPathEvened/rez%d.png",h));
 		}
 	}
 	catch (std::exception& ex) {
