@@ -5,8 +5,8 @@
 
 using namespace std;
 
-constexpr ureal theta = 30. / 180. * std::numbers::pi;//こんだけ傾ける
-const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.8,0.8);
+constexpr ureal theta = 15. / 180. * std::numbers::pi;//こんだけ傾ける
+const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.95,0.95);
 
 //ローカルから見たスキャン位置　t 回転角度,gh スキャンラインの高さ(グローバル)　theta ローカルの傾き
 uvec2 ScanPointWithGh(ureal t,ureal gh,ureal theta) {
@@ -33,16 +33,21 @@ int main() {
 		//plotの準備
 		auto plotter = SetupPythonRuntime();//pythonをセットアップする
 		DefinePythonFunctions(plotter);//梅本的基本関数を定義
+		plotter->send_command(R"(
+# 軸範囲の設定
+ax.set_xlim(-1.,1.)
+ax.set_ylim(-1.,1.)
+ax.set_zlim(-1.,1.))");
+		plotter->send_command("cm = plt.get_cmap(\"Spectral\")\n");//カラーセットを作る
 
 		//高さを変えてplt
-		constexpr size_t scanheightResolution = 40;
-		while(1)for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
-			plotter->send_command("plt.clf()\n");
-			plotter->send_command("t=[]\nv=[]\nr=[]\n");
+		constexpr size_t scanheightResolution = 100;
+		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
+			plotter->send_command("#ax.clear()\n");
+			plotter->send_command("x=[]\ny=[]\nv=[]\n");
 
-			//いまのscan高さ
+			//いまのscan高さ(グローバル)
 			const auto scanHeight = uleap(scanHeightRange, h / (ureal)(scanheightResolution - 1));
-			cout << scanHeight << endl;
 
 			constexpr size_t circleRes = 360;
 			for (std::decay<decltype(circleRes)>::type phi = 0; phi < circleRes; phi++) {
@@ -52,17 +57,34 @@ int main() {
 				const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPathCross);//レンズパスからの高さ UV球ローカル
 				//...これを直線にしなきゃいけない　
 
-				plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\n", t, scanHFromLensesPath, scanUV.x()));
+				//plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\n", t, scanHFromLensesPath, scanUV.x()));
 			}
 
-			plotter->send_command(StringFormat("plt.text(0,-1.5,\"theta = 30[deg], scan height = %f\")",scanHeight));
-			plotter->send_command("plt.plot(t,r,label=\"r [rad]\",color=\"magenta\")\n");
-			plotter->send_command("plt.plot(t,v,label=\"v\",color=\"cyan\")\n");
-			plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"UV coordition\")\n");
-			plotter->send_command("plt.legend()\n");
+			//グラフをplt
+			//plotter->send_command(StringFormat("plt.text(0,-1.5,\"theta = 30[deg], scan height = %f\")",scanHeight));
+			//plotter->send_command("plt.plot(t,r,label=\"r [rad]\",color=\"magenta\")\n");
+			//plotter->send_command("plt.plot(t,v,label=\"v\",color=\"cyan\")\n");
+			//plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"UV coordition\")\n");
+			//plotter->send_command("plt.legend()\n");
+
+			//NodeLensesPathCrossをpltしたい
+			constexpr size_t lensespathRes = 360;
+			for (std::decay<decltype(lensespathRes)>::type pindex = 0; pindex <= lensespathRes; pindex++) {
+				const ureal pireg = uleap(std::make_pair(-std::numbers::pi, +std::numbers::pi), pindex / (ureal)lensespathRes);
+
+				const auto pathv = NodeLensesPathCross(pireg, scanHeight, theta);//ローカルでのレンズパス
+				//その時の半径(ローカル半径)
+				const auto radiusNowH = sqrt(1. - pow(pathv, 2));
+				plotter->send_command(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
+			}
+			plotter->send_command(StringFormat("plt.plot(x,y,v,label=\"v\",color=cm(%f))\n", h / (ureal)(scanheightResolution - 1)));
+
+
 			plotter->pause(.1);
 			plotter->save(StringFormat("C:/local/user/lensball/lensball/results3/rez%d.png",h));
 		}
+
+		plotter->show();
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
