@@ -6,7 +6,7 @@
 using namespace std;
 
 constexpr ureal theta = 15. / 180. * std::numbers::pi;//こんだけ傾ける
-const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.95,0.95);
+const std::pair<ureal,ureal> scanHeightRange = make_pair(-1.,0.95);
 
 //ローカルから見たスキャン位置　t 回転角度,gh スキャンラインの高さ(グローバル)　theta ローカルの傾き
 uvec2 ScanPointWithGh(ureal t,ureal gh,ureal theta) {
@@ -49,16 +49,16 @@ ax.set_zlim(-1.,1.))");
 			//いまのscan高さ(グローバル)
 			const auto scanHeight = uleap(scanHeightRange, h / (ureal)(scanheightResolution - 1));
 
-			constexpr size_t circleRes = 360;
-			for (std::decay<decltype(circleRes)>::type phi = 0; phi < circleRes; phi++) {
-				const ureal t = uleap(std::make_pair(-std::numbers::pi, +std::numbers::pi), phi / (ureal)circleRes);//tを計算
+			//constexpr size_t circleRes = 360;
+			//for (std::decay<decltype(circleRes)>::type phi = 0; phi < circleRes; phi++) {
+			//	const ureal t = uleap(std::make_pair(-std::numbers::pi, +std::numbers::pi), phi / (ureal)circleRes);//tを計算
 
-				const auto scanUV = ScanPointWithGh(t, scanHeight, theta);//UV座標ゲット UV球ローカル
-				const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPathCross);//レンズパスからの高さ UV球ローカル
-				//...これを直線にしなきゃいけない　
+			//	const auto scanUV = ScanPointWithGh(t, scanHeight, theta);//UV座標ゲット UV球ローカル
+			//	const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPathCross);//レンズパスからの高さ UV球ローカル
+			//	//...これを直線にしなきゃいけない　
 
-				//plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\n", t, scanHFromLensesPath, scanUV.x()));
-			}
+			//	//plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\n", t, scanHFromLensesPath, scanUV.x()));
+			//}
 
 			//グラフをplt
 			//plotter->send_command(StringFormat("plt.text(0,-1.5,\"theta = 30[deg], scan height = %f\")",scanHeight));
@@ -74,13 +74,15 @@ ax.set_zlim(-1.,1.))");
 
 				const auto pathv = NodeLensesPathCross(pireg, scanHeight, theta);//ローカルでのレンズパス
 				//その時の半径(ローカル半径)
-				const auto radiusNowH = sqrt(1. - pow(pathv, 2));
+				const auto radiusNowH = sqrt(1. - clamp(pow(pathv, 2), -1., 1.));
+				if (radiusNowH != radiusNowH)
+					int xxx = 0;
 				plotter->send_command(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
 			}
 			plotter->send_command(StringFormat("plt.plot(x,y,v,label=\"v\",color=cm(%f))\n", h / (ureal)(scanheightResolution - 1)));
 
 
-			plotter->pause(.1);
+			plotter->pause(.01);
 			plotter->save(StringFormat("C:/local/user/lensball/lensball/results3/rez%d.png",h));
 		}
 
