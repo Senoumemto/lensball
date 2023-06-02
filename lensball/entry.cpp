@@ -20,7 +20,7 @@ ureal NodeLensesPath(ureal t,ureal gh,ureal theta) {
 }
 //レンズ配置パス関数　ローカル　これに沿ってレンズを並べると理想通りのスキャン軌跡の高さとなる
 ureal NodeLensesPathCross(ureal t, ureal gh, ureal theta) {
-	return sqrt(1 - pow(gh,2)) * cos(t) * sin(theta) - (2 * sqrt(1 - pow(gh,2)) * t * sin(theta)) / std::numbers::pi + gh * cos(theta);
+	return sqrt(1 - pow(gh,2)) * cos(t) * sin(theta) - (2 * sqrt(1 - pow(gh,2)) * t * sin(theta)) / (std::numbers::pi/2.) + gh * cos(theta);
 }
 //レンズパスからのスキャン軌跡の高さ レンズパスを指定してね
 ureal ScanHeightFromLensesPath(ureal t, ureal gh, ureal theta, const std::function<ureal(ureal, ureal, ureal)>& lensespath) {
@@ -74,14 +74,14 @@ ax.set_zlim(-1.,1.))");
 
 				const auto pathv = NodeLensesPathCross(pireg, scanHeight, theta);//ローカルでのレンズパス
 				//その時の半径(ローカル半径)
-				const auto radiusNowH = sqrt(1. - pow(pathv, 2));
+				const auto radiusNowH = sqrt(1. - clamp(pow(pathv, 2),-1.,1.));
 				plotter->send_command(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
 			}
 			plotter->send_command(StringFormat("plt.plot(x,y,v,label=\"v\",color=cm(%f))\n", h / (ureal)(scanheightResolution - 1)));
 
 
 			plotter->pause(.1);
-			plotter->save(StringFormat("C:/local/user/lensball/lensball/results3/rez%d.png",h));
+			plotter->save(StringFormat("C:/local/user/lensball/lensball/resultsX/CrossPathShape/rez%d.png",h));
 		}
 
 		plotter->show();
