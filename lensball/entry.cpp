@@ -20,7 +20,7 @@ ureal NodeLensesPath(ureal t,ureal gh,ureal theta) {
 }
 //レンズ配置パス関数　ローカル　これに沿ってレンズを並べると理想通りのスキャン軌跡の高さとなる
 ureal NodeLensesPathCross(ureal t, ureal gh, ureal theta) {
-	return sqrt(1 - pow(gh,2)) * cos(t) * sin(theta) - (2 * sqrt(1 - pow(gh,2)) * t * sin(theta)) / std::numbers::pi + gh * cos(theta);
+	return sqrt(1 - pow(gh,2)) * cos(t) * sin(theta) - (2 * sqrt(1 - pow(gh,2)) * t * sin(theta)) / (2.*std::numbers::pi) + gh * cos(theta);
 }
 //レンズパスからのスキャン軌跡の高さ レンズパスを指定してね
 ureal ScanHeightFromLensesPath(ureal t, ureal gh, ureal theta, const std::function<ureal(ureal, ureal, ureal)>& lensespath) {
@@ -36,7 +36,7 @@ int main() {
 
 		//高さを変えてplt
 		constexpr size_t scanheightResolution = 40;
-		while(1)for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
+		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
 			plotter->send_command("plt.clf()\n");
 			plotter->send_command("t=[]\nv=[]\nr=[]\n");
 
