@@ -114,3 +114,8 @@ bool RefractSnell(ray3& target, const uvec3& norm, const ureal eta);
 
 //˜A”Ôgif‚ğì‚é
 void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, const std::string& inputfile, const size_t fps);
+
+
+std::array<ureal, 3> RgbToHsv(const std::array<ureal, 3>& rgb);
+
+std::array<ureal, 3> HsvToRgb(std::array<ureal, 3> hsv);
