@@ -116,6 +116,7 @@ template<typename T>T uleap(const std::pair<T,T>& range,const T& t) {
 }
 
 
+
 namespace std {
 	template <typename Scalar, int Rows, int Cols>
 	struct hash<Eigen::Matrix<Scalar, Rows, Cols>> {

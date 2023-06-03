@@ -87,6 +87,11 @@ public:
     static void s(const std::string& s) {
         SendCommand(s);
     }
+
+    //フォーマットコマンドを送信する
+    template<typename ... Args>static void SendCommandFormat(const std::string& format, Args&& ... args) {
+        SendCommand(StringFormat(format, args...));
+    }
 };
 
 class matplotlib {

@@ -114,3 +114,6 @@ bool RefractSnell(ray3& target, const uvec3& norm, const ureal eta);
 
 //連番gifを作る
 void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, const std::string& inputfile, const size_t fps);
+
+//マイナス　プラスのペアを作る
+template<typename R>std::pair<R, R> PairMinusPlus(const R& val) { return std::make_pair(-val, val); }
