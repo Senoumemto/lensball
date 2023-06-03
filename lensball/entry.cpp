@@ -5,6 +5,8 @@
 
 using namespace std;
 
+const std::string rezpath = "C:/local/user/lensball/lensball/resultsX/";//Œ‹‰Ê‚ðŠi”[‚·‚éƒtƒHƒ‹ƒ_
+const std::string branchpath = "CrossPathShape/";//‚±‚Ìbranch‚ÌŒ‹‰Ê‚ðŠi”[‚·‚éƒtƒHƒ‹ƒ_
 constexpr ureal theta = 15. / 180. * std::numbers::pi;//‚±‚ñ‚¾‚¯ŒX‚¯‚é
 const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.95,0.95);
 
@@ -81,9 +83,10 @@ ax.set_zlim(-1.,1.))");
 
 
 			plotter->pause(.1);
-			plotter->save(StringFormat("C:/local/user/lensball/lensball/resultsX/CrossPathShape/rez%d.png",h));
+			plotter->save(StringFormat(rezpath + branchpath + "rez%d.png", h));
 		}
 
+		MakeGifAnim(rezpath + branchpath + "pallet.png", rezpath + branchpath + "anim.gif", rezpath + branchpath + "rez%d.png", scanheightResolution);
 		plotter->show();
 	}
 	catch (std::exception& ex) {

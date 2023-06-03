@@ -110,3 +110,7 @@ resultIntersecteSphere IntersectSphere(const arrow3& rayback, const uvec3& c, co
 ray3& ReflectMirror(ray3& target, const uvec3& norm);
 //‹üÜ‚·‚é
 bool RefractSnell(ray3& target, const uvec3& norm, const ureal eta);
+
+
+//˜A”Ôgif‚ğì‚é
+void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, const std::string& inputfile, const size_t fps);
