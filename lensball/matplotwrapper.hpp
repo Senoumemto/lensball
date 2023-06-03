@@ -64,6 +64,31 @@ std::string StringFormat(const std::string& format, Args&& ... args)
     return detail::StringFormatInternal(format, detail::Convert(std::forward<Args>(args)) ...);
 }
 
+class pythonRuntime {
+private:
+    //シングルトンのために
+    pythonRuntime() = delete;
+    pythonRuntime(const pythonRuntime&) = delete;
+    pythonRuntime& operator=(const pythonRuntime&) = delete;
+
+public:
+
+    static void Init() {
+        Py_Initialize();
+    }
+
+    //コマンドを送信する
+    static void SendCommand(const char* s) {
+        PyRun_SimpleString(s);
+    }
+    static void SendCommand(const std::string& command) {
+        SendCommand(command.c_str());
+    }
+    static void s(const std::string& s) {
+        SendCommand(s);
+    }
+};
+
 class matplotlib {
 
 public:

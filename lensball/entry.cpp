@@ -10,6 +10,8 @@ const std::string branchpath = "Junk/";//このbranchの結果を格納するフォルダ
 constexpr ureal theta = 5. / 180. * std::numbers::pi;//こんだけ傾ける
 const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.95,0.95);
 
+using py = pythonRuntime;
+
 //ローカルから見たスキャン位置　t 回転角度,gh スキャンラインの高さ(グローバル)　theta ローカルの傾き
 uvec2 ScanPointWithGh(ureal t,ureal gh,ureal theta) {
 	const ureal radius = sqrt(1. - pow(gh, 2));//スキャン高さでの軌跡の半径
@@ -31,22 +33,17 @@ ureal ScanHeightFromLensesPath(ureal t, ureal gh, ureal theta, const std::functi
 
 int main() {
 
+	//ローカル座標系で表示中　グローバル高さ=一定(つまり光線は常に同じ方向)で軌跡を書いて、それをローカルvでみたときに直線(レンズをevenlyにスキャンするために)にスキャンするためのレンズ配置を描画
+
 	try {
-		//plotの準備
-		auto plotter = SetupPythonRuntime();//pythonをセットアップする
-		//DefinePythonFunctions(plotter);//梅本的基本関数を定義
-//		plotter->send_command(R"(
-//# 軸範囲の設定
-//ax.set_xlim(-1.,1.)
-//ax.set_ylim(-1.,1.)
-//ax.set_zlim(-1.,1.))");
-//		plotter->send_command("cm = plt.get_cmap(\"Spectral\")\n");//カラーセットを作る
+		//pythonランタイムを準備していろいろ初期処理
+		py::Init();
+		py::s("import numpy as np\nfrom mayavi import mlab\n");
 
 		//高さを変えてplt
 		constexpr size_t scanheightResolution = 100;
 		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
-			//plotter->send_command("#ax.clear()\n");
-			plotter->send_command("x=[]\ny=[]\nv=[]\n");
+			py::s("x=[]\ny=[]\nv=[]\n");//軌跡plt用変数を初期化
 
 			//いまのscan高さ(グローバル)
 			const auto scanHeight = uleap(scanHeightRange, h / (ureal)(scanheightResolution - 1));
@@ -67,18 +64,18 @@ int main() {
 				const auto pathv = NodeLensesPathCross(pireg, scanHeight, theta);//ローカルでのレンズパス
 				//その時の半径(ローカル半径)
 				const auto radiusNowH = sqrt(1. - clamp(pow(pathv, 2),-1.,1.));
-				plotter->send_command(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
+				py::s(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
 			}
-			plotter->send_command(StringFormat("mlab.plot3d(x,y,v)\n"));
-
-			plotter->send_command(StringFormat("mlab.savefig(filename=\'%s\')", StringFormat(rezpath + branchpath + "rez%d.png", h)));
-			//plotter->pause(.1);
-			//plotter->save(StringFormat(rezpath + branchpath + "rez%d.png", h));
+			//pltしてファイルに保存
+			py::s(StringFormat("mlab.plot3d(x,y,v)\n"));
+			py::s(StringFormat("mlab.savefig(filename=\'%s\')", StringFormat(rezpath + branchpath + "rez%d.png", h)));
 
 			//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
-		plotter->send_command("mlab.show()\n");
+
+		//終わったらふつうに表示してgifアニメを作る
 		MakeGifAnim(rezpath + branchpath + "pallet.png", rezpath + branchpath + "anim.gif", rezpath + branchpath + "rez%d.png", scanheightResolution);
+		py::s("mlab.show()\n");
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
