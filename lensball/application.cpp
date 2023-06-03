@@ -6,6 +6,7 @@ uptr<matplotlib> SetupPythonRuntime() {
 	uptr<matplotlib> ret = make_unique<matplotlib>();
 	ret->open(R"(
 import numpy as np
+from mayavi import mlab
 
 #ノンブロッキングで表示
 plt.show(block=False)

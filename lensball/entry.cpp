@@ -6,7 +6,7 @@
 using namespace std;
 
 const std::string rezpath = "C:/local/user/lensball/lensball/resultsX/";//結果を格納するフォルダ
-const std::string branchpath = "CrossPathShape/";//このbranchの結果を格納するフォルダ
+const std::string branchpath = "Junk/";//このbranchの結果を格納するフォルダ
 constexpr ureal theta = 5. / 180. * std::numbers::pi;//こんだけ傾ける
 const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.95,0.95);
 
@@ -34,18 +34,18 @@ int main() {
 	try {
 		//plotの準備
 		auto plotter = SetupPythonRuntime();//pythonをセットアップする
-		DefinePythonFunctions(plotter);//梅本的基本関数を定義
-		plotter->send_command(R"(
-# 軸範囲の設定
-ax.set_xlim(-1.,1.)
-ax.set_ylim(-1.,1.)
-ax.set_zlim(-1.,1.))");
-		plotter->send_command("cm = plt.get_cmap(\"Spectral\")\n");//カラーセットを作る
+		//DefinePythonFunctions(plotter);//梅本的基本関数を定義
+//		plotter->send_command(R"(
+//# 軸範囲の設定
+//ax.set_xlim(-1.,1.)
+//ax.set_ylim(-1.,1.)
+//ax.set_zlim(-1.,1.))");
+//		plotter->send_command("cm = plt.get_cmap(\"Spectral\")\n");//カラーセットを作る
 
 		//高さを変えてplt
 		constexpr size_t scanheightResolution = 100;
 		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
-			plotter->send_command("#ax.clear()\n");
+			//plotter->send_command("#ax.clear()\n");
 			plotter->send_command("x=[]\ny=[]\nv=[]\n");
 
 			//いまのscan高さ(グローバル)
@@ -57,17 +57,7 @@ ax.set_zlim(-1.,1.))");
 
 				const auto scanUV = ScanPointWithGh(t, scanHeight, theta);//UV座標ゲット UV球ローカル
 				const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPathCross);//レンズパスからの高さ UV球ローカル
-				//...これを直線にしなきゃいけない　
-
-				//plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\n", t, scanHFromLensesPath, scanUV.x()));
 			}
-
-			//グラフをplt
-			//plotter->send_command(StringFormat("plt.text(0,-1.5,\"theta = 30[deg], scan height = %f\")",scanHeight));
-			//plotter->send_command("plt.plot(t,r,label=\"r [rad]\",color=\"magenta\")\n");
-			//plotter->send_command("plt.plot(t,v,label=\"v\",color=\"cyan\")\n");
-			//plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"UV coordition\")\n");
-			//plotter->send_command("plt.legend()\n");
 
 			//NodeLensesPathCrossをpltしたい
 			constexpr size_t lensespathRes = 360;
@@ -79,15 +69,16 @@ ax.set_zlim(-1.,1.))");
 				const auto radiusNowH = sqrt(1. - clamp(pow(pathv, 2),-1.,1.));
 				plotter->send_command(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
 			}
-			plotter->send_command(StringFormat("plt.plot(x,y,v,label=\"v\",color=cm(%f))\n", h / (ureal)(scanheightResolution - 1)));
+			plotter->send_command(StringFormat("mlab.plot3d(x,y,v)\n"));
 
+			plotter->send_command(StringFormat("mlab.savefig(filename=\'%s\')", StringFormat(rezpath + branchpath + "rez%d.png", h)));
+			//plotter->pause(.1);
+			//plotter->save(StringFormat(rezpath + branchpath + "rez%d.png", h));
 
-			plotter->pause(.1);
-			plotter->save(StringFormat(rezpath + branchpath + "rez%d.png", h));
+			//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
-
+		plotter->send_command("mlab.show()\n");
 		MakeGifAnim(rezpath + branchpath + "pallet.png", rezpath + branchpath + "anim.gif", rezpath + branchpath + "rez%d.png", scanheightResolution);
-		plotter->show();
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
