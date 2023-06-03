@@ -118,4 +118,4 @@ void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, c
 
 std::array<ureal, 3> RgbToHsv(const std::array<ureal, 3>& rgb);
 
-std::array<ureal, 3> HsvToRgb(std::array<ureal, 3> hsv);
+std::array<ureal, 3> HsvToRgb(const std::array<ureal, 3>& hsv);

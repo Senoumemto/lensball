@@ -279,26 +279,22 @@ std::array<ureal, 3> RgbToHsv(const std::array<ureal, 3>& rgb) {
 	return hsv;
 }
 
-std::array<ureal, 3> HsvToRgb(std::array<ureal, 3> hsv) {
+std::array<ureal, 3> HsvToRgb(const std::array<ureal, 3>& hsv) {
 	std::array<ureal, 3> rgb;
 
-	int tempi, tempm, tempn, tempk;
-	double tempf;
-	int i, j;
+	int tempi;
+	ureal tempm, tempn, tempk, tempf;
 
-	hsv.at(0) *= 359;
-	hsv.at(1) *= 255;
-	hsv.at(2) *= 255;
 
 	if (hsv.at(1) == 0.) {
 		rgb.at(0) = rgb.at(1) = rgb.at(2) = hsv.at(2);
 	}
 	else {
-		tempi = (int)floor(hsv.at(0) / 60.0);
-		tempf = hsv.at(0) / 60.0 - tempi;
-		tempm = hsv.at(2) * (1 - hsv.at(1) / 255.0);
-		tempn = hsv.at(2) * (1 - (hsv.at(1) / 255.0) * tempf);
-		tempk = hsv.at(2) * (1 - (hsv.at(1) / 255.0) * (1 - tempf));
+		tempi = (decltype(tempi))floor(hsv.at(0) * 6.);
+		tempf = hsv.at(0) * 6. - tempi;
+		tempm = hsv.at(2) * (1. - hsv.at(1));
+		tempn = hsv.at(2) * (1. - (hsv.at(1)) * tempf);
+		tempk = hsv.at(2) * (1. - (hsv.at(1)) * (1. - tempf));
 
 		switch (tempi) {
 		case 0:

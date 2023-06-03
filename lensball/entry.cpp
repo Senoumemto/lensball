@@ -68,7 +68,7 @@ int main() {
 			}
 			//plt‚µ‚Äƒtƒ@ƒCƒ‹‚É•Û‘¶
 			auto col = HsvToRgb({ h/100.,1.,1. });
-			py::s(StringFormat(StringFormat("mlab.plot3d(x,y,v,color=(%f,%f,%f))\n", col.at(0)/255,col.at(1)/255,col.at(2)/255)));
+			py::s(StringFormat(StringFormat("mlab.plot3d(x,y,v,color=(%f,%f,%f))\n", col.at(0), col.at(1), col.at(2))));
 			py::s(StringFormat("mlab.savefig(filename=\'%s\')", StringFormat(rezpath + branchpath + "rez%d.png", h)));
 
 			//std::this_thread::sleep_for(std::chrono::milliseconds(100));
