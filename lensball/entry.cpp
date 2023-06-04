@@ -31,7 +31,7 @@ int main() {
 				}
 		
 		for (const auto& vp : vfield)
-			py::SendCommandFormat("mlab.quiver3d(%f,%f,%f,%f,%f,%f)\n",vp.org().x(), vp.org().y(), vp.org().z(), vp.dir().x(), vp.dir().y(), vp.dir().z());
+			py::SendCommandFormat("mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(%f,%f,%f))\n",vp.org().x(), vp.org().y(), vp.org().z(), vp.dir().x(), vp.dir().y(), vp.dir().z(), fabs(vp.dir().x()), fabs(vp.dir().y()), fabs(vp.dir().z()));
 
 		//終わったらふつうに表示してgifアニメを作る
 		//MakeGifAnim(rezpath + branchpath + "pallet.png", rezpath + branchpath + "anim.gif", rezpath + branchpath + "rez%d.png", scanheightResolution);
