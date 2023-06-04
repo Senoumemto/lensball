@@ -117,3 +117,7 @@ void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, c
 
 //マイナス　プラスのペアを作る
 template<typename R>std::pair<R, R> PairMinusPlus(const R& val) { return std::make_pair(-val, val); }
+
+std::array<ureal, 3> RgbToHsv(const std::array<ureal, 3>& rgb);
+
+std::array<ureal, 3> HsvToRgb(const std::array<ureal, 3>& hsv);

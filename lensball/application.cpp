@@ -253,3 +253,81 @@ void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, c
 	system(MakePallet.c_str());
 	system(MakeAnim.c_str());
 }
+
+
+std::array<ureal, 3> RgbToHsv(const std::array<ureal, 3>& rgb) {
+	std::array<ureal, 3> hsv;
+	auto max = std::max_element(rgb.cbegin(), rgb.cend());
+	auto min = std::min_element(rgb.cbegin(), rgb.cend());
+
+	hsv.at(2) = *max;
+	hsv.at(1) = (*max - *min) / *max;
+
+	switch (std::distance(rgb.cbegin(), max)) {
+	case 0:
+		hsv.at(0) = 60. * (rgb.at(2) - rgb.at(1)) / (*max - *min);
+		break;
+	case 1:
+		hsv.at(0) = 60. * (2. + (rgb.at(0) - rgb.at(2)) / (*max - *min));
+		break;
+	case 2:
+		hsv.at(0) = 60. * (3 + (rgb.at(1) - rgb.at(0)) / (*max - *min));
+		break;
+	}
+	//hsvをスケーリング
+	hsv.at(0) = hsv.at(0) / 360.;
+
+	return hsv;
+}
+
+std::array<ureal, 3> HsvToRgb(const std::array<ureal, 3>& hsv) {
+	std::array<ureal, 3> rgb;
+
+	int tempi;
+	ureal tempm, tempn, tempk, tempf;
+
+
+	if (hsv.at(1) == 0.) {
+		rgb.at(0) = rgb.at(1) = rgb.at(2) = hsv.at(2);
+	}
+	else {
+		tempi = (decltype(tempi))floor(hsv.at(0) * 6.);
+		tempf = hsv.at(0) * 6. - tempi;
+		tempm = hsv.at(2) * (1. - hsv.at(1));
+		tempn = hsv.at(2) * (1. - (hsv.at(1)) * tempf);
+		tempk = hsv.at(2) * (1. - (hsv.at(1)) * (1. - tempf));
+
+		switch (tempi) {
+		case 0:
+			rgb.at(0) = hsv.at(2);
+			rgb.at(1) = tempk;
+			rgb.at(2) = tempm;
+			break;
+		case 1:
+			rgb.at(0) = tempn;
+			rgb.at(1) = hsv.at(2);
+			rgb.at(2) = tempm;
+			break;
+		case 2:
+			rgb.at(0) = tempm;
+			rgb.at(1) = hsv.at(2);
+			rgb.at(2) = tempk;
+			break;
+		case 3:
+			rgb.at(0) = tempm;
+			rgb.at(1) = tempn;
+			rgb.at(2) = hsv.at(2);
+			break;
+		case 4:
+			rgb.at(0) = tempk;
+			rgb.at(1) = tempm;
+			rgb.at(2) = hsv.at(2);
+			break;
+		case 5:
+			rgb.at(0) = hsv.at(2);
+			rgb.at(1) = tempm;
+			rgb.at(2) = tempn;
+		}
+	}
+	return rgb;
+}
