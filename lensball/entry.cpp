@@ -69,33 +69,51 @@ int main() {
 		py::s("import numpy as np\nfrom mayavi import mlab\nimport math\nfrom scipy.spatial.transform import Rotation\n");
 
 		//あるコイルを配置する
-		const ureal coillen = 10.;
+		const ureal coillen = 1.;
 		const ureal coilr = 1.;
 		const arrow3 coilposdir = arrow3(uvec3(0, 0, 0), uvec3(0, 0, 1).normalized());
 		const ureal coilpitch = coillen/10.;//1周あたりに進む長さ
 		const ureal coilsplit = 16. * (coillen / coilpitch);//分割数
-		DrawCoil(coilr, coillen, coilposdir, coilpitch, coilsplit);
+		const std::pair<size_t, size_t> coilnum = make_pair<size_t, size_t>(4,4);//コイルの数　x方向とy
+		const std::pair<ureal,ureal> coildist = make_pair<ureal,ureal>(4.,4.);//コイル同士の距離
+		for(std::decay<decltype(coilnum)::first_type>::type cx=0;cx<coilnum.first;cx++)
+			for (std::decay<decltype(coilnum)::second_type>::type cy = 0; cy < coilnum.second; cy++) {
+				//0,0のときのオフセットを計算する
+				const uvec2 offset(-(ureal)(coilnum.first - 1) * coildist.first/2., -(ureal)(coilnum.second - 1) * coildist.second/2.);
+				DrawCoil(coilr, coillen, arrow3(uvec3(offset.x() + coildist.first * cx, offset.y() + coildist.second * cy, 0), uvec3(0, 0, 1).normalized()), coilpitch, coilsplit);
+			}
+
 
 		//コイルが作る地場を計算する
 		std::list<arrow3> vfield;
-		constexpr ureal halfCubeEdgeLength = 6. / 2.;//場を作るキューブの一辺の長さの半分
-		constexpr std::array<size_t, 3> cubeResolution = { 6,6,6 };
+		constexpr std::array<ureal, 3> halfCubeEdgeLength = { 12. / 2. ,12. / 2. ,4. / 2. };//場を作るキューブの一辺の長さの半分
+		constexpr std::array<size_t, 3> cubeResolution = { 12,12,4 };
 		for (std::decay<decltype(cubeResolution)::value_type>::type z = 0; z < cubeResolution.at(2); z++)
 			for (std::decay<decltype(cubeResolution)::value_type>::type y = 0; y < cubeResolution.at(1); y++)
 				for (std::decay<decltype(cubeResolution)::value_type>::type x = 0; x < cubeResolution.at(0); x++) {
-					const uvec3 nowp(uleap(PairMinusPlus(halfCubeEdgeLength), x / (ureal)(cubeResolution.at(0) - 1)),
-						uleap(PairMinusPlus(halfCubeEdgeLength), y / (ureal)(cubeResolution.at(1) - 1)),
-						uleap(PairMinusPlus(halfCubeEdgeLength), z / (ureal)(cubeResolution.at(2) - 1)));//今の座標
+					const uvec3 nowp(uleap(PairMinusPlus(halfCubeEdgeLength[0]), x / (ureal)(cubeResolution.at(0) - 1)),
+						uleap(PairMinusPlus(halfCubeEdgeLength[1]), y / (ureal)(cubeResolution.at(1) - 1)),
+						uleap(PairMinusPlus(halfCubeEdgeLength[2]), z / (ureal)(cubeResolution.at(2) - 1)));//今の座標
 
-					const uvec3 dir = MagFieldFromCircuitCurrent(nowp, 1, [&](const ureal& t) {
-						return arrow3(uvec3(cos(t), sin(t), 0.), uvec3(-sin(t), cos(t), 0)); }, 1., 1000);
+					uvec3 dir = uvec3::Zero();
+					//すべてのコールの影響を計算する
+					for (std::decay<decltype(coilnum)::first_type>::type cx = 0; cx < coilnum.first; cx++)
+						for (std::decay<decltype(coilnum)::second_type>::type cy = 0; cy < coilnum.second; cy++) {
+							//0,0のときのオフセットを計算する
+							const uvec2 offset(-(ureal)(coilnum.first - 1) * coildist.first / 2., -(ureal)(coilnum.second - 1) * coildist.second / 2.);
+							const auto coilcenter = uvec3(offset.x() + coildist.first * cx, offset.y() + coildist.second * cy, 0);
+
+
+							dir += MagFieldFromCircuitCurrent(nowp, 1, [&](const ureal& t) {
+								return arrow3(uvec3(cos(t), sin(t), 0.)+ coilcenter, uvec3(-sin(t), cos(t), 0)); }, 0.25, 1000);
+						}
 
 					vfield.push_back(arrow3(nowp, dir));
 				}
 		//plt
 		for (const auto& vp : vfield) {
 			const ureal len = vp.dir().norm();
-			const std::array<ureal, 3> color = { clamp(len * 10.,0.,1.),0.,0. };
+			const std::array<ureal, 3> color = { clamp(fabs(vp.dir().x()*30.),0.,1.),clamp(fabs(vp.dir().y()*30.),0.,1.) ,clamp(fabs(vp.dir().z()*30.),0.,1.) };
 			py::SendCommandFormat("vfields = mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(%f,%f,%f))\n", vp.org().x(), vp.org().y(), vp.org().z(), vp.dir().x(), vp.dir().y(), vp.dir().z(), color.at(0), color.at(1), color.at(2));
 			py::SendCommand("vfields.glyph.glyph_source.glyph_position=\"center\"");
 		}
