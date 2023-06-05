@@ -35,7 +35,7 @@ int main() {
 	try {
 		//pythonランタイムを準備していろいろ初期処理
 		py::Init();
-		py::s("import numpy as np\nfrom mayavi import mlab\n");
+		py::s("import numpy as np\nfrom mayavi import mlab\nimport matplotlib.pyplot as plt");
 
 		//mayaviの設定
 		const std::pair<size_t, size_t> figResolution(800, 600);
@@ -65,15 +65,20 @@ int main() {
 				py::sf("s[0].append(%f)\ns[1].append(%f)\ns[2].append(%f)\nl[0].append(%f)\nl[1].append(%f)\nl[2].append(%f)\n", scanPath.x(), scanPath.y(), scanPath.z(), bestLensPos.x(), bestLensPos.y(), bestLensPos.z());
 			}
 
-			//py::s("mlab.plot3d(s[0],s[1],s[2])");
+			py::s("mlab.plot3d(s[0],s[1],s[2])");
 			py::s("mlab.plot3d(l[0],l[1],l[2])");
 
 			const auto rayTerm = PolarToXyz(uvec2(rayWay, 0.));//レイを描画する　原点から...ここまで
 			py::sf("mlab.plot3d([0,%f],[0,%f],[0,%f],color=(%f,0.5,0.5))", rayTerm.x(), rayTerm.y(), rayTerm.z(), (rayWay + projectorHalfAngle) / (2. * projectorHalfAngle));
 		}
 
-
-		py::s("mlab.show()");
+		py::s(R"(
+x = np.arange(-5, 5, 0.1) #-5から5まで0.1区切りで配列を作る
+y = np.sin(x) #配列xの値に関してそれぞれsin(x)を求めてy軸の配列を生成
+plt.plot(x,y)
+plt.show()
+)");
+		py::s("mlab.show()\nplt.show()");
 		
 	}
 	catch (std::exception& ex) {
