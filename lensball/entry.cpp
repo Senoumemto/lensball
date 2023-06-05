@@ -40,6 +40,11 @@ int main() {
 		py::Init();
 		py::s("import numpy as np\nfrom mayavi import mlab\n");
 
+		//mayaviの設定
+		const std::pair<size_t, size_t> figResolution(800, 600);
+		py::s(StringFormat("fig = mlab.figure( size=(%d,%d), bgcolor=(0,0,0) )", figResolution.first, figResolution.second));
+
+
 		const Eigen::AngleAxis<ureal> TransformLocalToGlobal(theta, uvec3::UnitY());//ローカル->グローバル変換を定義
 
 		//高さを変えてplt
