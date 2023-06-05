@@ -53,6 +53,7 @@ int main() {
 			const ureal rayWay = uleap(PairMinusPlus(projectorHalfAngle), rayWayD / (ureal)(rayWayResolution - 1));//レイの方向(theta)
 
 			py::s("s=[[],[],[]]\nl=[[],[],[]]");//スキャンパスとレンズ
+			py::s("lsp=[[],[]]");//レンズの極座標
 
 			//球をぐるぐる回す　phi方向
 			for (std::decay<decltype(rotationResolution)>::type tD = 0; tD < rotationResolution; tD++) {
@@ -63,22 +64,22 @@ int main() {
 
 				//描画を転送する
 				py::sf("s[0].append(%f)\ns[1].append(%f)\ns[2].append(%f)\nl[0].append(%f)\nl[1].append(%f)\nl[2].append(%f)\n", scanPath.x(), scanPath.y(), scanPath.z(), bestLensPos.x(), bestLensPos.y(), bestLensPos.z());
+				py::sf("lsp[0].append(%f)\nlsp[1].append(%f)", LensAlignment(t, lensSizeOnTheta, rayWay).x(), LensAlignment(t, lensSizeOnTheta, rayWay).y());
 			}
-
+			//レイノスキャンパスとレンズの配置を描画
 			py::s("mlab.plot3d(s[0],s[1],s[2])");
 			py::s("mlab.plot3d(l[0],l[1],l[2])");
+
+			//二次元でもplt
+			py::s("plt.plot(lsp[0],lsp[1],\"r--\")");
 
 			const auto rayTerm = PolarToXyz(uvec2(rayWay, 0.));//レイを描画する　原点から...ここまで
 			py::sf("mlab.plot3d([0,%f],[0,%f],[0,%f],color=(%f,0.5,0.5))", rayTerm.x(), rayTerm.y(), rayTerm.z(), (rayWay + projectorHalfAngle) / (2. * projectorHalfAngle));
 		}
 
-		py::s(R"(
-x = np.arange(-5, 5, 0.1) #-5から5まで0.1区切りで配列を作る
-y = np.sin(x) #配列xの値に関してそれぞれsin(x)を求めてy軸の配列を生成
-plt.plot(x,y)
-plt.show()
-)");
-		py::s("mlab.show()\nplt.show()");
+		//表示する 3d 2dの順
+		py::s("mlab.show()");
+		py::s("plt.show()");
 		
 	}
 	catch (std::exception& ex) {
