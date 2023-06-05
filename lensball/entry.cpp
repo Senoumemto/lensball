@@ -67,6 +67,9 @@ int main() {
 
 			//py::s("mlab.plot3d(s[0],s[1],s[2])");
 			py::s("mlab.plot3d(l[0],l[1],l[2])");
+
+			const auto rayTerm = PolarToXyz(uvec2(rayWay, 0.));//ÉåÉCÇï`âÊÇ∑ÇÈÅ@å¥ì_Ç©ÇÁ...Ç±Ç±Ç‹Ç≈
+			py::sf("mlab.plot3d([0,%f],[0,%f],[0,%f],color=(%f,0.5,0.5))", rayTerm.x(), rayTerm.y(), rayTerm.z(), (rayWay + projectorHalfAngle) / (2. * projectorHalfAngle));
 		}
 
 
