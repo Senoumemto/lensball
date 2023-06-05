@@ -6,7 +6,7 @@
 using namespace std;
 
 constexpr ureal theta = 30. / 180. * std::numbers::pi;//こんだけ傾ける
-const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.5,0.5);
+const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.8,0.8);
 
 //ローカルから見たスキャン位置　t 回転角度,gh スキャンラインの高さ(グローバル)　theta ローカルの傾き
 uvec2 ScanPointWithGh(ureal t,ureal gh,ureal theta) {
@@ -38,7 +38,8 @@ int main() {
 		constexpr size_t scanheightResolution = 40;
 		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
 			plotter->send_command("plt.clf()\n");
-			plotter->send_command("t=[]\nv=[]\nr=[]\n");
+			plotter->send_command("plt.ylim(-1,1)");
+			plotter->send_command("t=[]\nv=[]\nr=[]\nl=[]\ns=[]\n");
 
 			//いまのscan高さ
 			const auto scanHeight = uleap(scanHeightRange, h / (ureal)(scanheightResolution - 1));
@@ -49,18 +50,21 @@ int main() {
 				const ureal t = uleap(std::make_pair(-std::numbers::pi, +std::numbers::pi), phi / (ureal)circleRes);//tを計算
 
 				const auto scanUV = ScanPointWithGh(t, scanHeight, theta);//UV座標ゲット UV球ローカル
-				const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPath);//レンズパスからの高さ UV球ローカル
+				const auto lensheight = NodeLensesPathCross(t, scanHeight, theta);
+				const auto scanHFromLensesPath = ScanHeightFromLensesPath(t, scanHeight, theta, NodeLensesPathCross);//レンズパスからの高さ UV球ローカル
 				//...これを直線にしなきゃいけない　
 
-				plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\n", t, scanHFromLensesPath, scanUV.x()));
+				plotter->send_command(StringFormat("t.append(%f)\nv.append(%f)\nr.append(%f)\nl.append(%f)\ns.append(%f)", t, scanUV.y(), scanUV.x(), lensheight, scanHFromLensesPath));
 			}
 
-			plotter->send_command(StringFormat("plt.text(0,-1.5,\"theta = 30[deg], scan height = %f\")",scanHeight));
-			plotter->send_command("plt.plot(t,r,label=\"r [rad]\",color=\"magenta\")\n");
-			plotter->send_command("plt.plot(t,v,label=\"v\",color=\"cyan\")\n");
+			plotter->send_command(StringFormat("plt.text(0,-0.8,\"theta = %f[deg], scan height = %f\")", theta / std::numbers::pi * 180., scanHeight));
+			//plotter->send_command("plt.plot(t,r,label=\"r [rad]\",color=\"magenta\")\n");
+			plotter->send_command("plt.plot(t,v,label=\"v\",color=\"green\")\n");
+			plotter->send_command("plt.plot(t,l,label=\"ldag\",color=\"lawngreen\")\n");
+			plotter->send_command("plt.plot(t,s,label=\"sdag\",color=\"orchid\")\n");
 			plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"UV coordition\")\n");
 			plotter->send_command("plt.legend()\n");
-			plotter->pause(.1);
+			plotter->pause(.01);
 			plotter->save(StringFormat("C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPath/rez%d.png",h));
 		}
 	}
