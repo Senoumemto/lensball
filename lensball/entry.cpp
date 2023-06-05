@@ -41,7 +41,7 @@ int main() {
 		py::s("import numpy as np\nfrom mayavi import mlab\n");
 
 		//高さを変えてplt
-		constexpr size_t scanheightResolution = 60;
+		constexpr size_t scanheightResolution = 40;
 		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
 			py::s("x=[]\ny=[]\nv=[]\n");//軌跡plt用変数を初期化
 
@@ -67,7 +67,7 @@ int main() {
 				py::s(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
 			}
 			//pltしてファイルに保存
-			auto col = HsvToRgb({ h/100.,1.,1. });
+			auto col = HsvToRgb({ h/(ureal)scanheightResolution,1.,1. });
 			py::s(StringFormat(StringFormat("mlab.plot3d(x,y,v,color=(%f,%f,%f))\n", col.at(0), col.at(1), col.at(2))));
 			py::s(StringFormat("mlab.savefig(filename=\'%s\')", StringFormat(rezpath + branchpath + "rez%d.png", h)));
 
@@ -75,7 +75,7 @@ int main() {
 		}
 
 		//終わったらふつうに表示してgifアニメを作る
-		MakeGifAnim(rezpath + branchpath + "pallet.png", rezpath + branchpath + "anim.gif", rezpath + branchpath + "rez%d.png", scanheightResolution);
+		MakeGifAnim(rezpath + branchpath + "pallet.png", rezpath + branchpath + "anim.gif", rezpath + branchpath + "rez%d.png", scanheightResolution/2);
 		py::s("mlab.show()\n");
 	}
 	catch (std::exception& ex) {
