@@ -119,3 +119,7 @@ void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, c
 std::array<ureal, 3> RgbToHsv(const std::array<ureal, 3>& rgb);
 
 std::array<ureal, 3> HsvToRgb(const std::array<ureal, 3>& hsv);
+
+template<typename T> std::pair<T,T> PairMinusPlus(const T& t) {
+	return std::make_pair(-t, +t);
+}
