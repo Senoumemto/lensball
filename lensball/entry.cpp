@@ -40,6 +40,11 @@ int main() {
 		py::Init();
 		py::s("import numpy as np\nfrom mayavi import mlab\n");
 
+
+		//mayavi‚Ìİ’è
+		const std::pair<size_t, size_t> figResolution(800, 600);
+		py::s(StringFormat("fig = mlab.figure( size=(%d,%d), bgcolor=(0,0,0) )", figResolution.first, figResolution.second));
+
 		//‚‚³‚ğ•Ï‚¦‚Äplt
 		constexpr size_t scanheightResolution = 40;
 		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
