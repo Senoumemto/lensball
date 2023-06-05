@@ -246,3 +246,12 @@ bool RefractSnell(ray3& target, const uvec3& norm, const ureal eta) {
 	target.push_back(arrow3(ins.org(), e.normalized()));
 	return true;
 }
+
+//òAî‘gifÇçÏÇÈ
+void MakeGifAnim(const std::string& palletfile, const std::string& outputfile, const std::string& inputfile, const size_t fps) {
+	const std::string MakePallet = StringFormat("ffmpeg -i %s -vf palettegen -y %s", inputfile, palletfile);
+	const std::string MakeAnim = StringFormat("ffmpeg -r %d -i %s -i %s -lavfi paletteuse -y %s", fps, inputfile, palletfile, outputfile);
+
+	system(MakePallet.c_str());
+	system(MakeAnim.c_str());
+}

@@ -62,11 +62,13 @@ int main() {
 			plotter->send_command("plt.plot(t,v,label=\"v\",color=\"green\")\n");
 			plotter->send_command("plt.plot(t,l,label=\"ldag\",color=\"lawngreen\")\n");
 			plotter->send_command("plt.plot(t,s,label=\"sdag\",color=\"orchid\")\n");
-			plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"UV coordition\")\n");
+			plotter->send_command("plt.xlabel(\"Rotation angle [rad]\")\nplt.ylabel(\"local UV coordition\")\n");
 			plotter->send_command("plt.legend()\n");
 			plotter->pause(.01);
 			plotter->save(StringFormat("C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPath/rez%d.png",h));
 		}
+
+		MakeGifAnim("C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPath/palette.png", "C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPath/outputrez.gif", "C:/local/user/lensball/lensball/resultsX/ScanPathFromLensesPath/rez%d.png", 40 / 2);
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
