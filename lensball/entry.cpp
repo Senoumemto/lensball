@@ -7,7 +7,7 @@ using namespace std;
 
 const std::string rezpath = "C:/local/user/lensball/lensball/resultsX/";//結果を格納するフォルダ
 const std::string branchpath = "Junk/";//このbranchの結果を格納するフォルダ
-constexpr ureal theta = 5. / 180. * std::numbers::pi;//こんだけ傾ける
+constexpr ureal theta = 10. / 180. * std::numbers::pi;//こんだけ傾ける
 const std::pair<ureal,ureal> scanHeightRange = make_pair(-0.95,0.95);
 
 using py = pythonRuntime;
@@ -40,6 +40,8 @@ int main() {
 		py::Init();
 		py::s("import numpy as np\nfrom mayavi import mlab\n");
 
+		const Eigen::AngleAxis<ureal> TransformLocalToGlobal(theta, uvec3::UnitY());//ローカル->グローバル変換を定義
+
 		//高さを変えてplt
 		constexpr size_t scanheightResolution = 40;
 		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
@@ -64,7 +66,9 @@ int main() {
 				const auto pathv = NodeLensesPathCross(pireg, scanHeight, theta);//ローカルでのレンズパス
 				//その時の半径(ローカル半径)
 				const auto radiusNowH = sqrt(1. - clamp(pow(pathv, 2),-1.,1.));
-				py::s(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", radiusNowH*cos(pireg), radiusNowH*sin(pireg), pathv));
+				const uvec3 localpos(radiusNowH * cos(pireg), radiusNowH * sin(pireg), pathv);//ローカルでの軌跡(上の一点)
+				const uvec3 pltpos = TransformLocalToGlobal*localpos;
+				py::s(StringFormat("x.append(%f)\ny.append(%f)\nv.append(%f)\n", pltpos.x(), pltpos.y(), pltpos.z()));
 			}
 			//pltしてファイルに保存
 			auto col = HsvToRgb({ h/(ureal)scanheightResolution,1.,1. });
