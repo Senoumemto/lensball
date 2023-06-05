@@ -41,7 +41,7 @@ int main() {
 		py::s("import numpy as np\nfrom mayavi import mlab\n");
 
 		//‚‚³‚ğ•Ï‚¦‚Äplt
-		constexpr size_t scanheightResolution = 100;
+		constexpr size_t scanheightResolution = 60;
 		for (std::decay<decltype(scanheightResolution)>::type h = 0; h < scanheightResolution; h++) {
 			py::s("x=[]\ny=[]\nv=[]\n");//‹OÕplt—p•Ï”‚ğ‰Šú‰»
 
