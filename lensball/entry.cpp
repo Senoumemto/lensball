@@ -67,14 +67,15 @@ int main() {
 				py::sf("lsp[0].append(%f)\nlsp[1].append(%f)", LensAlignment(t, lensSizeOnTheta, rayWay).x(), LensAlignment(t, lensSizeOnTheta, rayWay).y());
 			}
 			//レイノスキャンパスとレンズの配置を描画
-			py::s("mlab.plot3d(s[0],s[1],s[2])");
-			py::s("mlab.plot3d(l[0],l[1],l[2])");
+			//py::s("mlab.plot3d(s[0],s[1],s[2])");
+			auto color = HsvToRgb({ (ureal)rayWayD/(ureal)(10.),1.,1.});
+			py::sf("mlab.plot3d(l[0],l[1],l[2],color=(%f,%f,%f))", color[0], color[1], color[2]);
 
 			//二次元でもplt
-			py::s("plt.plot(lsp[0],lsp[1],\"r--\")");
+			py::sf("plt.plot(lsp[1],lsp[0],color=(%f,%f,%f))", color[0], color[1], color[2]);
 
 			const auto rayTerm = PolarToXyz(uvec2(rayWay, 0.));//レイを描画する　原点から...ここまで
-			py::sf("mlab.plot3d([0,%f],[0,%f],[0,%f],color=(%f,0.5,0.5))", rayTerm.x(), rayTerm.y(), rayTerm.z(), (rayWay + projectorHalfAngle) / (2. * projectorHalfAngle));
+			py::sf("mlab.plot3d([0,%f],[0,%f],[0,%f],color=(%f,%f,%f))", rayTerm.x(), rayTerm.y(), rayTerm.z(), color[0], color[1], color[2]);
 		}
 
 		//表示する 3d 2dの順
