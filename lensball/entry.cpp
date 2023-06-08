@@ -41,47 +41,50 @@ int main() {
 		const std::pair<size_t, size_t> figResolution(800, 600);
 		py::sf("fig = mlab.figure( size=(%d,%d), bgcolor=(0,0,0) )", figResolution.first, figResolution.second);
 
-		//プロジェクタから放出するレイはtheta方向に広がる
-		constexpr size_t rayWayResolution = 5;
-		constexpr ureal projectorHalfAngle = 30. / 180. * pi;
-		//球の回し方
-		constexpr size_t rotationResolution = 100;
+		//球を描画する
+		constexpr ureal sphereRadius = 1.;
+		constexpr size_t sphereResolution = 20;
+		py::sf(R"(
+[sphphi,sphtheta] = np.mgrid[0:2*np.pi:%dj,0:np.pi:%dj]
+x = np.cos(sphphi)*np.sin(sphtheta)
+y = np.sin(sphphi)*np.sin(sphtheta)
+z = np.cos(sphtheta)
+mlab.mesh(%f*x, %f*y, %f*z )  
+)", sphereResolution, sphereResolution, sphereRadius, sphereRadius, sphereRadius);
 
-		constexpr ureal lensSizeOnTheta = (180. / 10.) / 180. * pi;//レンズのtheta方向の大きさ
+		//polar座標系においておんなじ大きさを持って並んでいるとき
+		constexpr ureal lensnumTheta = 10;
+		constexpr ureal lensnumPhi = lensnumTheta * 2;//phiは二倍の広がりを持ってるから
+		constexpr ureal lensSize = (2. * std::numbers::pi) / (lensnumPhi * 2.);//レンズの半径を決める 半周を数のバイで割ればいい
 
-		for (std::decay<decltype(rayWayResolution)>::type rayWayD = 0; rayWayD < rayWayResolution; rayWayD++) {
-			const ureal rayWay = uleap(PairMinusPlus(projectorHalfAngle), rayWayD / (ureal)(rayWayResolution - 1));//レイの方向(theta)
+		constexpr size_t lensResolution = 18;//レンズの外形円の解像度
+		py::sf("lentheta = np.linspace(-np.pi,np.pi,%d)",lensResolution);//python側で作っとく
 
-			py::s("s=[[],[],[]]\nl=[[],[],[]]");//スキャンパスとレンズ
-			py::s("lsp=[[],[]]");//レンズの極座標
+		for(std::decay<decltype(lensnumTheta)>::type td=0;td<lensnumTheta;td++)
+			for (std::decay<decltype(lensnumPhi)>::type pd = 0; pd < lensnumPhi; pd++) {
+				//中心位置を作る
+				const auto nowp = uvec2(uleap(PairMinusPlus(pi), pd / (ureal)lensnumPhi) + (pi / (ureal)(2 * lensnumPhi)),
+					uleap(PairMinusPlus(pi / 2.), td / (ureal)lensnumTheta) + ((pi / 2.) / (ureal)(2 * lensnumTheta)));
 
-			//球をぐるぐる回す　phi方向
-			for (std::decay<decltype(rotationResolution)>::type tD = 0; tD < rotationResolution; tD++) {
-				const ureal t = uleap(PairMinusPlus(pi), tD / (ureal)(rotationResolution - 1));//回転角度(phi)
+				//レンズの大きさを計算する
+				py::sf("plt.plot(%f*np.cos(lentheta)+%f, %f*np.sin(lentheta)+%f)", lensSize, nowp.x(), lensSize, nowp.y());
 
-				const auto scanPath = PolarToXyz(RayHitPath(rayWay, t));//このレイが当たった点(ローカル)
-				const auto bestLensPos = PolarToXyz(LensAlignment(t, lensSizeOnTheta, rayWay));//レイの交点の直下のレンズの場所(ローカル)
+				//極座標に変換する
+				py::s("x=[]\ny=[]\nz=[]");
+				for (std::decay<decltype(lensResolution)>::type ld = 0; ld < lensResolution; ld++) {
+					const ureal lentheta = uleap(PairMinusPlus(pi), ld / (ureal)lensResolution);
+					const auto polarpos = PolarToXyz(uvec2(lensSize * cos(lentheta), lensSize * sin(lentheta)) + nowp);
 
-				//描画を転送する
-				py::sf("s[0].append(%f)\ns[1].append(%f)\ns[2].append(%f)\nl[0].append(%f)\nl[1].append(%f)\nl[2].append(%f)\n", scanPath.x(), scanPath.y(), scanPath.z(), bestLensPos.x(), bestLensPos.y(), bestLensPos.z());
-				py::sf("lsp[0].append(%f)\nlsp[1].append(%f)", LensAlignment(t, lensSizeOnTheta, rayWay).x(), LensAlignment(t, lensSizeOnTheta, rayWay).y());
+					py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
+				}
+
+				py::s("mlab.plot3d(x,y,z)");//プロット
+
 			}
-			//レイノスキャンパスとレンズの配置を描画
-			//py::s("mlab.plot3d(s[0],s[1],s[2])");
-			auto color = HsvToRgb({ (ureal)rayWayD/(ureal)(10.),1.,1.});
-			py::sf("mlab.plot3d(l[0],l[1],l[2],color=(%f,%f,%f))", color[0], color[1], color[2]);
 
-			//二次元でもplt
-			py::sf("plt.plot(lsp[1],lsp[0],color=(%f,%f,%f))", color[0], color[1], color[2]);
-
-			const auto rayTerm = PolarToXyz(uvec2(rayWay, 0.));//レイを描画する　原点から...ここまで
-			py::sf("mlab.plot3d([0,%f],[0,%f],[0,%f],color=(%f,%f,%f))", rayTerm.x(), rayTerm.y(), rayTerm.z(), color[0], color[1], color[2]);
-		}
 
 		//表示する 3d 2dの順
-		py::s("mlab.show()");
 		py::s("plt.show()");
-		
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
