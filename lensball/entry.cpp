@@ -23,11 +23,14 @@ uvec2 LensAlignment(const ureal& t, const ureal& lsize, const ureal rayTheta) {
 	return uvec2(theta, t);
 }
 
-//球面極座標を直交座標に変換
+//球面極座標を直交座標に変換 //
 uvec3 PolarToXyz(const uvec2& spolar) {
 	return uvec3(cos(spolar.x()) * cos(spolar.y()),
 		cos(spolar.x()) * sin(spolar.y()),
 		sin(spolar.x()));
+}
+uvec3 PolarToXyz(const ureal phi,const ureal theta) {
+	return PolarToXyz(uvec2(theta, phi));
 }
 
 int main() {
@@ -55,7 +58,7 @@ mlab.mesh(%f*x, %f*y, %f*z )
 		//polar座標系においておんなじ大きさを持って並んでいるとき
 		constexpr ureal lensnumTheta = 10;
 		constexpr ureal lensnumPhi = lensnumTheta * 2;//phiは二倍の広がりを持ってるから
-		constexpr ureal lensSize = (2. * std::numbers::pi) / (lensnumPhi * 2.);//レンズの半径を決める 半周を数のバイで割ればいい
+		constexpr ureal lensSize = (pi) / (lensnumTheta * 2.);//レンズの半径を決める 半周を数のバイで割ればいい
 
 		constexpr size_t lensResolution = 18;//レンズの外形円の解像度
 		py::sf("lentheta = np.linspace(-np.pi,np.pi,%d)",lensResolution);//python側で作っとく
@@ -64,7 +67,7 @@ mlab.mesh(%f*x, %f*y, %f*z )
 			for (std::decay<decltype(lensnumPhi)>::type pd = 0; pd < lensnumPhi; pd++) {
 				//中心位置を作る
 				const auto nowp = uvec2(uleap(PairMinusPlus(pi), pd / (ureal)lensnumPhi) + (pi / (ureal)(2 * lensnumPhi)),
-					uleap(PairMinusPlus(pi / 2.), td / (ureal)lensnumTheta) + ((pi / 2.) / (ureal)(2 * lensnumTheta)));
+					uleap(PairMinusPlus(pi/2.), td / (ureal)lensnumTheta) + ((pi / 2.) / (ureal)(2 * lensnumTheta)));
 
 				//レンズの大きさを計算する
 				py::sf("plt.plot(%f*np.cos(lentheta)+%f, %f*np.sin(lentheta)+%f)", lensSize, nowp.x(), lensSize, nowp.y());
@@ -73,7 +76,9 @@ mlab.mesh(%f*x, %f*y, %f*z )
 				py::s("x=[]\ny=[]\nz=[]");
 				for (std::decay<decltype(lensResolution)>::type ld = 0; ld < lensResolution; ld++) {
 					const ureal lentheta = uleap(PairMinusPlus(pi), ld / (ureal)lensResolution);
-					const auto polarpos = PolarToXyz(uvec2(lensSize * cos(lentheta), lensSize * sin(lentheta)) + nowp);
+					const auto aspect = (pi / lensnumTheta) / (2. * pi * cos(nowp.y()) / lensnumPhi);//2pi*cos(theta)を数を割ったものとpiをthetaResで割ったものがアスペクト比
+					const auto invpolar = uvec2(lensSize * cos(lentheta), lensSize * sin(lentheta)/aspect) + nowp;
+					const auto polarpos = PolarToXyz(invpolar.x(), invpolar.y());
 
 					py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
 				}
