@@ -60,30 +60,35 @@ mlab.mesh(%f*x, %f*y, %f*z )
 		constexpr ureal lensnumPhi = lensnumTheta * 2;//phiは二倍の広がりを持ってるから
 		constexpr ureal lensSize = (pi) / (lensnumTheta * 2.);//レンズの半径を決める 半周を数のバイで割ればいい
 
-		constexpr size_t lensResolution = 18;//レンズの外形円の解像度
+		constexpr size_t lensResolution = 20;//レンズの外形円の解像度
 		py::sf("lentheta = np.linspace(-np.pi,np.pi,%d)",lensResolution);//python側で作っとく
 
 		for(std::decay<decltype(lensnumTheta)>::type td=0;td<lensnumTheta;td++)
 			for (std::decay<decltype(lensnumPhi)>::type pd = 0; pd < lensnumPhi; pd++) {
 				//中心位置を作る
-				const auto nowp = uvec2(uleap(PairMinusPlus(pi), pd / (ureal)lensnumPhi) + (pi / (ureal)(2 * lensnumPhi)),
-					uleap(PairMinusPlus(pi/2.), td / (ureal)lensnumTheta) + ((pi / 2.) / (ureal)(2 * lensnumTheta)));
+				const auto nowp = uvec2(uleap(PairMinusPlus(pi), pd / (ureal)lensnumPhi) + (2.*pi / (ureal)(2*lensnumPhi)),
+					uleap(PairMinusPlus(pi/2.), td / (ureal)lensnumTheta) + ((pi/2.*2.) / (ureal)(2 * lensnumTheta)));
 
-				//レンズの大きさを計算する
-				py::sf("plt.plot(%f*np.cos(lentheta)+%f, %f*np.sin(lentheta)+%f)", lensSize, nowp.x(), lensSize, nowp.y());
 
 				//極座標に変換する
-				py::s("x=[]\ny=[]\nz=[]");
+				py::s("x=[]\ny=[]\nz=[]\nlenx=[]\nleny=[]");
 				for (std::decay<decltype(lensResolution)>::type ld = 0; ld < lensResolution; ld++) {
-					const ureal lentheta = uleap(PairMinusPlus(pi), ld / (ureal)lensResolution);
-					const auto aspect = (pi / lensnumTheta) / (2. * pi * cos(nowp.y()) / lensnumPhi);//2pi*cos(theta)を数を割ったものとpiをthetaResで割ったものがアスペクト比
-					const auto invpolar = uvec2(lensSize * cos(lentheta), lensSize * sin(lentheta)/aspect) + nowp;
-					const auto polarpos = PolarToXyz(invpolar.x(), invpolar.y());
+					const ureal lenCycle = uleap(PairMinusPlus(pi), ld / (ureal)(lensResolution-1));
+					//球面座標にマッピング座標を作る ローカル
+					const ureal localphi = lensSize * cos(lenCycle)+ nowp.x();//経度を出す　こちらは球面上ではcos(theta)倍される
+					const ureal localtheta = lensSize * sin(lenCycle)+ nowp.y();//まず今の緯度を出す こっちもcos(theta倍すればいいやん)
+					uvec2 phiV = uvec2(localphi, 2.*atan(pow(std::numbers::e,localtheta))-pi/2.);//2Dマップ座標
+					py::sf("lenx.append(%f)\nleny.append(%f)", phiV.x(), phiV.y());
+
+					//これをどうマップするか　極座標系で渡せばいいから
+					const auto polarpos = PolarToXyz(phiV.x(), phiV.y());
 
 					py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
 				}
 
-				py::s("mlab.plot3d(x,y,z)");//プロット
+				//プロット
+				py::s("plt.plot(lenx,leny)");
+				py::s("mlab.plot3d(x,y,z)");
 
 			}
 
