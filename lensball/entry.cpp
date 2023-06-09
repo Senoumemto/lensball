@@ -77,7 +77,7 @@ mlab.mesh(%f*x, %f*y, %f*z )
 					//球面座標にマッピング座標を作る ローカル
 					const ureal localphi = lensSize * cos(lenCycle)+ nowp.x();//経度を出す　こちらは球面上ではcos(theta)倍される
 					const ureal localtheta = lensSize * sin(lenCycle)+ nowp.y();//まず今の緯度を出す こっちもcos(theta倍すればいいやん)
-					uvec2 phiV = uvec2(localphi, 2.*atan(pow(std::numbers::e,localtheta))-pi/2.);//2Dマップ座標
+					uvec2 phiV = uvec2(localphi, 2. * atan(pow(std::numbers::e, -localtheta)) + pi / 2.);//2Dマップ座標 メルカトル
 					py::sf("lenx.append(%f)\nleny.append(%f)", phiV.x(), phiV.y());
 
 					//これをどうマップするか　極座標系で渡せばいいから
