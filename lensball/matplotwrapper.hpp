@@ -76,6 +76,9 @@ public:
     static void Init() {
         Py_Initialize();
     }
+    static void Terminate() {
+        Py_Finalize();
+    }
 
     //コマンドを送信する
     static void SendCommand(const char* s) {

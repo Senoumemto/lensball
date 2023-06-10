@@ -98,10 +98,16 @@ mlab.mesh(%f*x, %f*y, %f*z )
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
+		py::Terminate();
 		return -1;
 	}
 	catch (...) {
 		cout << "unknown err" << endl;
+		py::Terminate();
 		return -2;
 	}
+
+
+	py::Terminate();
+	return 0;
 }
