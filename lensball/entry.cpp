@@ -58,6 +58,7 @@ z = np.cos(sphtheta)
 mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )  
 )", sphereResolution, sphereResolution, sphereRadius, sphereRadius, sphereRadius);
 
+		//レンズアレイを作成
 		//縦を基準に考える　列が合ってずらしながら描画していく
 		constexpr size_t lensNumInCollum = 10;
 		constexpr size_t collumNum = lensNumInCollum * 2;//範囲的に倍
@@ -104,6 +105,32 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 			}
 		}
 
+		//スキャンをする
+		constexpr size_t projectorResInTheta = 40;
+		constexpr ureal projectorHalfAngle = 60. / 180. * pi;
+		constexpr size_t scanLineResolutionPhi = 180;
+		for (std::decay<decltype(projectorResInTheta)>::type sd = 0; sd < projectorResInTheta; sd++) {
+			//スキャンラインの高さ
+			const ureal scanTheta = uleap(PairMinusPlus(projectorHalfAngle), sd / (ureal)(projectorResInTheta - 1));
+
+			//ラインを描画する
+			py::s("x=[]\ny=[]\nz=[]\nslx=[]\nsly=[]");
+			for (std::decay<decltype(scanLineResolutionPhi)>::type rd = 0; rd < scanLineResolutionPhi; rd++) {
+				const ureal time = uleap(PairMinusPlus(pi), rd / (ureal)(scanLineResolutionPhi - 1));
+
+				uvec2 mapped = uvec2(time,scanTheta);
+				py::sf("slx.append(%f)\nsly.append(%f)", mapped.x(), mapped.y());
+
+				//これをどうマップするか　極座標系で渡せばいいから
+				const auto polarpos = PolarToXyz(mapped.x(), mapped.y());
+				py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
+			}
+
+			//plt
+			auto color = HsvToRgb({ uleap({0.,1.},sd / (ureal)projectorResInTheta),1.,0.5 });
+			py::sf("plt.plot(slx,sly,color=(%f,%f,%f))", color[0], color[1], color[2]);
+			py::sf("mlab.plot3d(x,y,z,color=(%f,%f,%f),tube_radius=0.01)", color[0], color[1], color[2]);
+		}
 
 		//表示する 3d 2dの順
 		py::s("plt.show()");
