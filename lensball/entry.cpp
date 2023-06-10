@@ -44,6 +44,9 @@ int main() {
 		const std::pair<size_t, size_t> figResolution(800, 600);
 		py::sf("fig = mlab.figure( size=(%d,%d), bgcolor=(0,0,0) )", figResolution.first, figResolution.second);
 
+		//matplotlib‚Ìİ’è
+		py::s("fig, ax = plt.subplots()\nax.set_aspect(\"equal\")");
+
 		//‹…‚ğ•`‰æ‚·‚é
 		constexpr ureal sphereRadius = 1.;
 		constexpr size_t sphereResolution = 20;
