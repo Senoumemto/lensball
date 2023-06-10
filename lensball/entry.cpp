@@ -55,32 +55,39 @@ int main() {
 x = np.cos(sphphi)*np.sin(sphtheta)
 y = np.sin(sphphi)*np.sin(sphtheta)
 z = np.cos(sphtheta)
-mlab.mesh(%f*x, %f*y, %f*z )  
+mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )  
 )", sphereResolution, sphereResolution, sphereRadius, sphereRadius, sphereRadius);
 
-		//polar座標系においておんなじ大きさを持って並んでいるとき
-		constexpr ureal lensnumTheta = 10;
-		constexpr ureal lensnumPhi = lensnumTheta * 2;//phiは二倍の広がりを持ってるから
-		constexpr ureal lensSize = (pi) / (lensnumTheta * 2.);//レンズの半径を決める 半周を数のバイで割ればいい
+		//縦を基準に考える　列が合ってずらしながら描画していく
+		constexpr size_t lensNumInCollum = 10;
+		constexpr size_t collumNum = lensNumInCollum * 2;//範囲的に倍
+		constexpr ureal lensRadiusInMap = pi / (ureal)lensNumInCollum/2.;//地図上でのレンズの経(角度)
+		constexpr ureal shiftSizeEachCollum = lensRadiusInMap * 2.;//列ごとにどれだけ位置をシフトさせるか
 
 		constexpr size_t lensResolution = 20;//レンズの外形円の解像度
-		py::sf("lentheta = np.linspace(-np.pi,np.pi,%d)",lensResolution);//python側で作っとく
 
-		for(std::decay<decltype(lensnumTheta)>::type td=0;td<lensnumTheta;td++)
-			for (std::decay<decltype(lensnumPhi)>::type pd = 0; pd < lensnumPhi; pd++) {
-				//中心位置を作る
-				const auto nowp = uvec2(uleap(PairMinusPlus(pi), pd / (ureal)lensnumPhi) + (2.*pi / (ureal)(2*lensnumPhi)),
-					uleap(PairMinusPlus(pi/2.), td / (ureal)lensnumTheta) + ((pi/2.*2.) / (ureal)(2 * lensnumTheta)));
+		for (std::decay<decltype(collumNum)>::type cd = 0; cd < collumNum; cd++) {//列ごとに
+			//列の位置を計算する(eq)
+			const ureal colPosEquater = uleap(PairMinusPlus(pi), cd / (ureal)collumNum) + lensRadiusInMap;
+			//今の列のオフセットを計算する
+			const ureal nowOffsetLatitude = shiftSizeEachCollum * uleap(PairMinusPlus(0.5), cd / (ureal)collumNum);
+
+			for (std::decay<decltype(lensNumInCollum)>::type lid = 0; lid < lensNumInCollum; lid++) {//列内の要素レンズについて
+				
+				//レンズ中心位置を作る　equater latitude
+				const auto nowp = uvec2(colPosEquater, uleap(PairMinusPlus(pi / 2.), lid / (ureal)lensNumInCollum) + lensRadiusInMap + nowOffsetLatitude);
 
 
 				//極座標に変換する
 				py::s("x=[]\ny=[]\nz=[]\nlenx=[]\nleny=[]");
 				for (std::decay<decltype(lensResolution)>::type ld = 0; ld < lensResolution; ld++) {
-					const ureal lenCycle = uleap(PairMinusPlus(pi), ld / (ureal)(lensResolution-1));
+					const ureal lenCycle = uleap(PairMinusPlus(pi), ld / (ureal)(lensResolution - 1));
 					//球面座標にマッピング座標を作る ローカル
-					const ureal localphi = lensSize * cos(lenCycle)+ nowp.x();//経度を出す　こちらは球面上ではcos(theta)倍される
-					const ureal localtheta = lensSize * sin(lenCycle)+ nowp.y();//まず今の緯度を出す こっちもcos(theta倍すればいいやん)
-					uvec2 mapped = uvec2(localphi, 2. * atan(-pow(std::numbers::e, -localtheta)) + pi / 2.);//2Dマップ座標 メルカトル
+					const ureal locallon = lensRadiusInMap * cos(lenCycle) + nowp.x();//経度を出す　こちらは球面上ではcos(theta)倍される
+					const ureal locallati = lensRadiusInMap * sin(lenCycle) + nowp.y();//まず今の緯度を出す こっちもcos(theta倍すればいいやん)
+
+					//uvec2 mapped = uvec2(locallon,locallati);//2Dマップ座標 そのまま
+					uvec2 mapped = uvec2(locallon, 2. * atan(-pow(std::numbers::e, -locallati)) + pi / 2.);//2Dマップ座標 メルカトル
 					py::sf("lenx.append(%f)\nleny.append(%f)", mapped.x(), mapped.y());
 
 					//これをどうマップするか　極座標系で渡せばいいから
@@ -90,10 +97,12 @@ mlab.mesh(%f*x, %f*y, %f*z )
 				}
 
 				//プロット
-				py::s("plt.plot(lenx,leny)");
-				py::s("mlab.plot3d(x,y,z)");
+				auto color = HsvToRgb({ uleap({0.,1.},cd / (ureal)collumNum),1.,1. });
+				py::sf("plt.plot(lenx,leny,color=(%f,%f,%f))", color[0], color[1], color[2]);
+				py::sf("mlab.plot3d(x,y,z,color=(%f,%f,%f))", color[0], color[1], color[2]);
 
 			}
+		}
 
 
 		//表示する 3d 2dの順
