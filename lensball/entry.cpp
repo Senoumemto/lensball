@@ -25,12 +25,13 @@ uvec2 LensAlignment(const ureal& t, const ureal& lsize, const ureal rayTheta) {
 
 //球面極座標を直交座標に変換 //
 uvec3 PolarToXyz(const uvec2& spolar) {
-	return uvec3(cos(spolar.x()) * cos(spolar.y()),
-		cos(spolar.x()) * sin(spolar.y()),
-		sin(spolar.x()));
+	return uvec3(cos(spolar.y()) * cos(spolar.x()),
+		cos(spolar.y()) * sin(spolar.x()),
+		sin(spolar.y()));
 }
-uvec3 PolarToXyz(const ureal phi,const ureal theta) {
-	return PolarToXyz(uvec2(theta, phi));
+
+uvec2 MapToPolar(const uvec2& xy) {
+	return uvec2(xy.x(), 2. * atan(-pow(std::numbers::e, -xy.y())) + pi / 2.);
 }
 
 int main() {
@@ -65,7 +66,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 		constexpr ureal lensRadiusInMap = pi / (ureal)lensNumInCollum/2.;//地図上でのレンズの経(角度)
 		constexpr ureal shiftSizeEachCollum = lensRadiusInMap * 2.;//列ごとにどれだけ位置をシフトさせるか
 
-		constexpr size_t lensResolution = 20;//レンズの外形円の解像度
+		constexpr size_t lensResolution = 6;//レンズの外形円の解像度
 
 		for (std::decay<decltype(collumNum)>::type cd = 0; cd < collumNum; cd++) {//列ごとに
 			//列の位置を計算する(eq)
@@ -88,11 +89,11 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 					const ureal locallati = lensRadiusInMap * sin(lenCycle) + nowp.y();//まず今の緯度を出す こっちもcos(theta倍すればいいやん)
 
 					//uvec2 mapped = uvec2(locallon,locallati);//2Dマップ座標 そのまま
-					uvec2 mapped = uvec2(locallon, 2. * atan(-pow(std::numbers::e, -locallati)) + pi / 2.);//2Dマップ座標 メルカトル
+					uvec2 mapped = MapToPolar(uvec2(locallon, locallati));//2Dマップ座標 メルカトル
 					py::sf("lenx.append(%f)\nleny.append(%f)", mapped.x(), mapped.y());
 
 					//これをどうマップするか　極座標系で渡せばいいから
-					const auto polarpos = PolarToXyz(mapped.x(), mapped.y());
+					const auto polarpos = PolarToXyz(mapped);
 
 					py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
 				}
@@ -122,7 +123,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 				py::sf("slx.append(%f)\nsly.append(%f)", mapped.x(), mapped.y());
 
 				//これをどうマップするか　極座標系で渡せばいいから
-				const auto polarpos = PolarToXyz(mapped.x(), mapped.y());
+				const auto polarpos = PolarToXyz(mapped);
 				py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
 			}
 
