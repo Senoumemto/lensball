@@ -37,9 +37,53 @@ uvec2 PolarToMap(const uvec2& xy) {
 	return uvec2(xy.x(), -log(abs(tan(xy.y() / 2. - pi / 4.))));
 }
 
+//系列を表す 次元と名前
+template<size_t DIM>class pyVecSeries :public std::string {
+	using super = std::string;
+	
+public:
+
+};
+
+//系列名を作成する
+template<size_t D> std::string GetSeriesPrefix(const unsigned char& id, std::optional<const std::reference_wrapper<std::array<const std::string, D>>>& prefixList) {
+	if (prefixList) {
+		std::array<const std::string, D>& ref = prefixList.value();
+		if (id < ref.size())return ref.at(id);
+	}
+	else if (id < 3)return { (char)('x' + id) };
+	
+	throw runtime_error("This function(GetSeriesPrefix) arrows id be 0~2.");
+}
+//pythonでベクトル系列を作成する
+template<size_t D>void ResetPyVecSeries(const pyVecSeries<D>& vecname, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+	std::string ret;
+	for (size_t i = 0; i < D; i++)
+		ret += StringFormat("%s%s=[]\n", vecname.c_str(), GetSeriesPrefix<D>(i, prefix));
+	
+	py::s(ret);
+}
+//pythonにベクトルをappendする
+template<typename VEC,size_t D=VEC::RowsAtCompileTime>void AppendPyVecSeries(const pyVecSeries<D>& vecname,const VEC& vec,std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+	std::string ret;
+	for (size_t i = 0; i < D; i++)
+		ret += StringFormat("%s%s.append(%f)\n", vecname.c_str(), GetSeriesPrefix<D>(i, prefix), vec[i]);
+
+	py::s(ret);
+}
+//pythonでベクトル系列を,で列挙したものを得る 要素が0のベクトルだとバグる
+template<size_t D>std::string GetPySeriesForPlot(const pyVecSeries<D>& vecname, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+	std::string ret=StringFormat("%s%s", vecname.c_str(), GetSeriesPrefix<D>(0, prefix));
+	for (size_t i = 1; i < D; i++)
+		ret += StringFormat(",%s%s", vecname.c_str(), GetSeriesPrefix<D>(i, prefix));
+
+	return ret;
+}
+
 int main() {
 
 	try {
+
 		//pythonランタイムを準備していろいろ初期処理
 		py::Init();
 		py::s("import numpy as np\nfrom mayavi import mlab\nimport matplotlib.pyplot as plt");
@@ -71,6 +115,10 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 
 		constexpr size_t lensResolution = 20;//レンズの外形円の解像度
 
+		//python plt用のベクトル系列名
+		const pyVecSeries<3> mlabSeries("mlabv");//mlabプロット用に使う3Dベクトル配列
+		const pyVecSeries<2> pypltSeries("pypltv");//二次元プロット用
+
 		for (std::decay<decltype(collumNum)>::type cd = 0; cd < collumNum; cd++) {//列ごとに
 			//列の位置を計算する(eq)
 			const ureal colPosEquater = uleap(PairMinusPlus(pi), cd / (ureal)collumNum) + lensRadiusInMap;
@@ -82,9 +130,9 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 				//レンズ中心位置を作る　equater latitude
 				const auto nowp = uvec2(colPosEquater, uleap(PairMinusPlus(pi / 2.), lid / (ureal)lensNumInCollum) + lensRadiusInMap + nowOffsetLatitude);
 
-
 				//極座標に変換する
-				py::s("x=[]\ny=[]\nz=[]\nlenx=[]\nleny=[]");
+				ResetPyVecSeries(mlabSeries);//x y z
+				ResetPyVecSeries(pypltSeries);
 				for (std::decay<decltype(lensResolution)>::type ld = 0; ld < lensResolution; ld++) {
 					const ureal lenCycle = uleap(PairMinusPlus(pi), ld / (ureal)(lensResolution - 1));
 					//球面座標にマッピング座標を作る ローカル
@@ -93,18 +141,18 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 
 					//uvec2 mapped = uvec2(locallon,locallati);//2Dマップ座標 そのまま
 					uvec2 mapped = uvec2(locallon, locallati);//2Dマップ座標 メルカトル
-					py::sf("lenx.append(%f)\nleny.append(%f)", mapped.x(), mapped.y());
+					AppendPyVecSeries(pypltSeries, mapped);
 
 					//これをどうマップするか　極座標系で渡せばいいから
 					const auto polarpos = PolarToXyz(mapped);
 
-					py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
+					AppendPyVecSeries(mlabSeries, polarpos);
 				}
 
 				//プロット
 				auto color = HsvToRgb({ uleap({0.,1.},cd / (ureal)collumNum),1.,1. });
-				py::sf("plt.plot(lenx,leny,color=(%f,%f,%f))", color[0], color[1], color[2]);
-				py::sf("mlab.plot3d(x,y,z,color=(%f,%f,%f))", color[0], color[1], color[2]);
+				py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
+				py::sf("mlab.plot3d(%s,color=(%f,%f,%f))", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 
 			}
 		}
@@ -118,22 +166,23 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 			const ureal scanTheta = uleap(PairMinusPlus(projectorHalfAngle), sd / (ureal)(projectorResInTheta - 1));
 
 			//ラインを描画する
-			py::s("x=[]\ny=[]\nz=[]\nslx=[]\nsly=[]");
+			ResetPyVecSeries(mlabSeries);//x y z
+			ResetPyVecSeries(pypltSeries);
 			for (std::decay<decltype(scanLineResolutionPhi)>::type rd = 0; rd < scanLineResolutionPhi; rd++) {
 				const ureal time = uleap(PairMinusPlus(pi), rd / (ureal)(scanLineResolutionPhi - 1));
 
 				uvec2 mapped = PolarToMap(uvec2(time, scanTheta));
-				py::sf("slx.append(%f)\nsly.append(%f)", mapped.x(), mapped.y());
+				AppendPyVecSeries(pypltSeries, mapped);
 
 				//これをどうマップするか　極座標系で渡せばいいから
 				const auto polarpos = PolarToXyz(mapped);
-				py::sf("x.append(%f)\ny.append(%f)\nz.append(%f)", polarpos.x(), polarpos.y(), polarpos.z());
+				AppendPyVecSeries(mlabSeries, polarpos);
 			}
 
 			//plt
 			auto color = HsvToRgb({ uleap({0.,1.},sd / (ureal)projectorResInTheta),1.,0.5 });
-			py::sf("plt.plot(slx,sly,color=(%f,%f,%f))", color[0], color[1], color[2]);
-			py::sf("mlab.plot3d(x,y,z,color=(%f,%f,%f),tube_radius=0.01)", color[0], color[1], color[2]);
+			py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
+			py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 		}
 
 		//表示する 3d 2dの順
