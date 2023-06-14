@@ -33,6 +33,9 @@ uvec3 PolarToXyz(const uvec2& spolar) {
 uvec2 MapToPolar(const uvec2& xy) {
 	return uvec2(xy.x(), 2. * atan(-pow(std::numbers::e, -xy.y())) + pi / 2.);
 }
+uvec2 PolarToMap(const uvec2& xy) {
+	return uvec2(xy.x(), -log(abs(tan(xy.y() / 2. - pi / 4.))));
+}
 
 int main() {
 
@@ -66,7 +69,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 		constexpr ureal lensRadiusInMap = pi / (ureal)lensNumInCollum/2.;//地図上でのレンズの経(角度)
 		constexpr ureal shiftSizeEachCollum = lensRadiusInMap * 2.;//列ごとにどれだけ位置をシフトさせるか
 
-		constexpr size_t lensResolution = 6;//レンズの外形円の解像度
+		constexpr size_t lensResolution = 20;//レンズの外形円の解像度
 
 		for (std::decay<decltype(collumNum)>::type cd = 0; cd < collumNum; cd++) {//列ごとに
 			//列の位置を計算する(eq)
@@ -89,7 +92,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 					const ureal locallati = lensRadiusInMap * sin(lenCycle) + nowp.y();//まず今の緯度を出す こっちもcos(theta倍すればいいやん)
 
 					//uvec2 mapped = uvec2(locallon,locallati);//2Dマップ座標 そのまま
-					uvec2 mapped = MapToPolar(uvec2(locallon, locallati));//2Dマップ座標 メルカトル
+					uvec2 mapped = uvec2(locallon, locallati);//2Dマップ座標 メルカトル
 					py::sf("lenx.append(%f)\nleny.append(%f)", mapped.x(), mapped.y());
 
 					//これをどうマップするか　極座標系で渡せばいいから
@@ -119,7 +122,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 			for (std::decay<decltype(scanLineResolutionPhi)>::type rd = 0; rd < scanLineResolutionPhi; rd++) {
 				const ureal time = uleap(PairMinusPlus(pi), rd / (ureal)(scanLineResolutionPhi - 1));
 
-				uvec2 mapped = uvec2(time,scanTheta);
+				uvec2 mapped = PolarToMap(uvec2(time, scanTheta));
 				py::sf("slx.append(%f)\nsly.append(%f)", mapped.x(), mapped.y());
 
 				//これをどうマップするか　極座標系で渡せばいいから
