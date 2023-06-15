@@ -79,6 +79,22 @@ template<size_t D>std::string GetPySeriesForPlot(const pyVecSeries<D>& vecname, 
 
 	return ret;
 }
+//二編幅から六角形を作る
+std::list<uvec2> MakeHexagon(const ureal& edgeWidth,const uvec2& centerpos,const ureal& rot) {
+	//外接球の半径を出したい
+	const ureal radius = 2.*edgeWidth / sqrt(3.);
+	std::list<uvec2> ret;
+
+	//点をぐるっと出していく
+	for (size_t i = 0; i < 6; i++) {
+		const auto t = uleap(PairMinusPlus(pi), i / 6.);
+
+		const uvec2 pos = radius * uvec2(sin(t - rot), cos(t - rot)) + centerpos;
+		ret.push_back(pos);
+	}
+
+	return ret;
+}
 
 int main() {
 
@@ -106,56 +122,44 @@ z = np.cos(sphtheta)
 mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )  
 )", sphereResolution, sphereResolution, sphereRadius, sphereRadius, sphereRadius);
 
-		//レンズアレイを作成
-		//縦を基準に考える　列が合ってずらしながら描画していく
-		constexpr size_t lensNumInCollum = 10;
-		constexpr size_t collumNum = lensNumInCollum * 2;//範囲的に倍
-		constexpr ureal lensRadiusInMap = pi / (ureal)lensNumInCollum/2.;//地図上でのレンズの経(角度)
-		constexpr ureal shiftSizeEachCollum = lensRadiusInMap * 2.;//列ごとにどれだけ位置をシフトさせるか
-
-		constexpr size_t lensResolution = 20;//レンズの外形円の解像度
 
 		//python plt用のベクトル系列名
 		const pyVecSeries<3> mlabSeries("mlabv");//mlabプロット用に使う3Dベクトル配列
 		const pyVecSeries<2> pypltSeries("pypltv");//二次元プロット用
 
-		for (std::decay<decltype(collumNum)>::type cd = 0; cd < collumNum; cd++) {//列ごとに
-			//列の位置を計算する(eq)
-			const ureal colPosEquater = uleap(PairMinusPlus(pi), cd / (ureal)collumNum) + lensRadiusInMap;
-			//今の列のオフセットを計算する
-			const ureal nowOffsetLatitude = shiftSizeEachCollum * uleap(PairMinusPlus(0.5), cd / (ureal)collumNum);
-
-			for (std::decay<decltype(lensNumInCollum)>::type lid = 0; lid < lensNumInCollum; lid++) {//列内の要素レンズについて
-				
-				//レンズ中心位置を作る　equater latitude
-				const auto nowp = uvec2(colPosEquater, uleap(PairMinusPlus(pi / 2.), lid / (ureal)lensNumInCollum) + lensRadiusInMap + nowOffsetLatitude);
-
-				//極座標に変換する
-				ResetPyVecSeries(mlabSeries);//x y z
+		//レンズアレイを作成
+		//六角形でタイリングする　偶数行を書いてから奇数行を書くって感じ
+		constexpr size_t lensNumInCollum = 20;
+		constexpr ureal slopeRow = 0.0;//行の傾き
+		const ureal rowAngle = atan(slopeRow);//行の角度
+		const ureal rowLength = 2. * pi / cos(rowAngle);//行の長さ
+		const ureal lensEdgeWidth = rowLength / (ureal)lensNumInCollum / 2.;
+		const ureal eachRowsDistance = lensEdgeWidth / (2. * sqrt(3.))*2.*1.5*2.;//六角形の一変だけシフトする
+		constexpr size_t rowNum = 15;//奇数にしてね
+		for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
+			const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
+			const bool eachFlag = rd % 2;//交互に切り替わるフラグ
+			for (std::decay<decltype(lensNumInCollum)>::type ld = 0; ld < lensNumInCollum; ld++) {
+				//六角形を収めるバッファをクリア
 				ResetPyVecSeries(pypltSeries);
-				for (std::decay<decltype(lensResolution)>::type ld = 0; ld < lensResolution; ld++) {
-					const ureal lenCycle = uleap(PairMinusPlus(pi), ld / (ureal)(lensResolution - 1));
-					//球面座標にマッピング座標を作る ローカル
-					const ureal locallon = lensRadiusInMap * cos(lenCycle) + nowp.x();//経度を出す　こちらは球面上ではcos(theta)倍される
-					const ureal locallati = lensRadiusInMap * sin(lenCycle) + nowp.y();//まず今の緯度を出す こっちもcos(theta倍すればいいやん)
+				ResetPyVecSeries(mlabSeries);
 
-					//uvec2 mapped = uvec2(locallon,locallati);//2Dマップ座標 そのまま
-					uvec2 mapped = uvec2(locallon, locallati);//2Dマップ座標 メルカトル
-					AppendPyVecSeries(pypltSeries, mapped);
+				const ureal tlonn = uleap(PairMinusPlus(pi), ld / (ureal)lensNumInCollum) + (eachFlag ? ((2. * pi) / (ureal)lensNumInCollum / 2.) : 0.);//lonn方向の現在位置
+				auto hexvertices = MakeHexagon(lensEdgeWidth, uvec2(tlonn, slopeRow * tlonn + tlati), rowAngle);//六角形の頂点
 
-					//これをどうマップするか　極座標系で渡せばいいから
-					const auto polarpos = PolarToXyz(mapped);
-
-					AppendPyVecSeries(mlabSeries, polarpos);
+				//頂点を転送して描画
+				hexvertices.push_back(hexvertices.front());//一周するために最初の点を末尾に挿入
+				for (const auto& v : hexvertices) {
+					AppendPyVecSeries(pypltSeries, v);
+					const auto polarpos = MapToPolar(v);//つぎに極座標を得る
+					AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
 				}
 
-				//プロット
-				auto color = HsvToRgb({ uleap({0.,1.},cd / (ureal)collumNum),1.,1. });
-				py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
-				py::sf("mlab.plot3d(%s,color=(%f,%f,%f))", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
-
+				py::sf("plt.plot(%s,color=(0,0,0))", GetPySeriesForPlot(pypltSeries));
+				py::sf("mlab.plot3d(%s,color=(0,0,0),tube_radius=0.02)", GetPySeriesForPlot(mlabSeries));
 			}
 		}
+
 
 		//スキャンをする
 		constexpr size_t projectorResInTheta = 40;
