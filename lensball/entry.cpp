@@ -129,12 +129,14 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 
 		//レンズアレイを作成
 		//六角形でタイリングする　偶数行を書いてから奇数行を書くって感じ
+
 		constexpr size_t lensNumInCollum = 20;
-		constexpr ureal slopeRow = 0.0;//行の傾き
-		const ureal rowAngle = atan(slopeRow);//行の角度
-		const ureal rowLength = 2. * pi / cos(rowAngle);//行の長さ
+
+		const ureal rowLength = 2. * pi;//行の長さ
 		const ureal lensEdgeWidth = rowLength / (ureal)lensNumInCollum / 2.;
-		const ureal eachRowsDistance = lensEdgeWidth / (2. * sqrt(3.))*2.*1.5*2.;//六角形の一変だけシフトする
+		const ureal eachRowsDistance = lensEdgeWidth / (2. * sqrt(3.)) * 2. * 1.5 * 2.;//六角形の一変だけシフトする
+		const ureal rowAngle = 2.*atan(-eachRowsDistance / (2. * pi));//行の角度
+		const Eigen::Rotation2D<ureal> localPlaneToGrobal(rowAngle);
 		constexpr size_t rowNum = 15;//奇数にしてね
 		for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 			const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
@@ -145,11 +147,12 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 				ResetPyVecSeries(mlabSeries);
 
 				const ureal tlonn = uleap(PairMinusPlus(pi), ld / (ureal)lensNumInCollum) + (eachFlag ? ((2. * pi) / (ureal)lensNumInCollum / 2.) : 0.);//lonn方向の現在位置
-				auto hexvertices = MakeHexagon(lensEdgeWidth, uvec2(tlonn, slopeRow * tlonn + tlati), rowAngle);//六角形の頂点
+				auto hexvertices = MakeHexagon(lensEdgeWidth, uvec2(tlonn, tlati), 0.);//六角形の頂点
 
 				//頂点を転送して描画
 				hexvertices.push_back(hexvertices.front());//一周するために最初の点を末尾に挿入
-				for (const auto& v : hexvertices) {
+				for (auto v : hexvertices) {
+					v = localPlaneToGrobal * v;
 					AppendPyVecSeries(pypltSeries, v);
 					const auto polarpos = MapToPolar(v);//つぎに極座標を得る
 					AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
