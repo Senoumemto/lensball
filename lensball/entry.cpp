@@ -132,10 +132,10 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 
 		constexpr size_t lensNumInCollum = 20;
 
-		const ureal rowLength = 2. * pi;//行の長さ
+		constexpr ureal rowAngle = 0.04331481 * 2.;//行の角度
+		const ureal rowLength = 2. * pi * cos(rowAngle);//行の長さ
 		const ureal lensEdgeWidth = rowLength / (ureal)lensNumInCollum / 2.;
-		const ureal eachRowsDistance = lensEdgeWidth / (2. * sqrt(3.)) * 2. * 1.5 * 2.;//六角形の一変だけシフトする
-		const ureal rowAngle = 2.*atan(-eachRowsDistance / (2. * pi));//行の角度
+		const ureal eachRowsDistance = 1.5 * rowLength / sqrt(3.) / (ureal)lensNumInCollum;//六角形の一変だけシフトする
 		const Eigen::Rotation2D<ureal> localPlaneToGrobal(rowAngle);
 		constexpr size_t rowNum = 15;//奇数にしてね
 		for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
@@ -146,7 +146,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 				ResetPyVecSeries(pypltSeries);
 				ResetPyVecSeries(mlabSeries);
 
-				const ureal tlonn = uleap(PairMinusPlus(pi), ld / (ureal)lensNumInCollum) + (eachFlag ? ((2. * pi) / (ureal)lensNumInCollum / 2.) : 0.);//lonn方向の現在位置
+				const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);//lonn方向の現在位置
 				auto hexvertices = MakeHexagon(lensEdgeWidth, uvec2(tlonn, tlati), 0.);//六角形の頂点
 
 				//頂点を転送して描画
@@ -158,8 +158,9 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 					AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
 				}
 
+				auto color = HsvToRgb({ uleap({0.,1.},ld / (ureal)lensNumInCollum),1.,0.5 });
 				py::sf("plt.plot(%s,color=(0,0,0))", GetPySeriesForPlot(pypltSeries));
-				py::sf("mlab.plot3d(%s,color=(0,0,0),tube_radius=0.02)", GetPySeriesForPlot(mlabSeries));
+				py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 			}
 		}
 
@@ -189,7 +190,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 			//plt
 			auto color = HsvToRgb({ uleap({0.,1.},sd / (ureal)projectorResInTheta),1.,0.5 });
 			py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
-			py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
+			//py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 		}
 
 		//表示する 3d 2dの順
