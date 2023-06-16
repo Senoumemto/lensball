@@ -29,6 +29,11 @@ uvec3 PolarToXyz(const uvec2& spolar) {
 		cos(spolar.y()) * sin(spolar.x()),
 		sin(spolar.y()));
 }
+uvec3 Polar3DToXyz(const uvec3& phiThetaRadius) {
+	return uvec3(phiThetaRadius.z() * cos(phiThetaRadius.y()) * cos(phiThetaRadius.x()),
+		phiThetaRadius.z() * cos(phiThetaRadius.y()) * sin(phiThetaRadius.x()),
+		phiThetaRadius.z() * sin(phiThetaRadius.y()));
+}
 
 uvec2 MapToPolar(const uvec2& xy) {
 	return uvec2(xy.x(), 2. * atan(-pow(std::numbers::e, -xy.y())) + pi / 2.);
@@ -80,7 +85,7 @@ template<size_t D>std::string GetPySeriesForPlot(const pyVecSeries<D>& vecname, 
 	return ret;
 }
 //二編幅から六角形を作る
-std::list<uvec2> MakeHexagon(const ureal& edgeWidth,const uvec2& centerpos,const ureal& rot) {
+std::list<uvec2> MakeHexagon(const ureal& edgeWidth) {
 	//外接球の半径を出したい
 	const ureal radius = 2.*edgeWidth / sqrt(3.);
 	std::list<uvec2> ret;
@@ -89,7 +94,7 @@ std::list<uvec2> MakeHexagon(const ureal& edgeWidth,const uvec2& centerpos,const
 	for (size_t i = 0; i < 6; i++) {
 		const auto t = uleap(PairMinusPlus(pi), i / 6.);
 
-		const uvec2 pos = radius * uvec2(sin(t - rot), cos(t - rot)) + centerpos;
+		const uvec2 pos = radius * uvec2(sin(t), cos(t));
 		ret.push_back(pos);
 	}
 
@@ -137,6 +142,8 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 		const ureal lensEdgeWidth = rowLength / (ureal)lensNumInCollum / 2.;
 		const ureal eachRowsDistance = 1.5 * rowLength / sqrt(3.) / (ureal)lensNumInCollum;//六角形の一変だけシフトする
 		const Eigen::Rotation2D<ureal> localPlaneToGrobal(rowAngle);
+
+		const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の直径
 		constexpr size_t rowNum = 15;//奇数にしてね
 		for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 			const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
@@ -147,15 +154,16 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 				ResetPyVecSeries(mlabSeries);
 
 				const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);//lonn方向の現在位置
-				auto hexvertices = MakeHexagon(lensEdgeWidth, uvec2(tlonn, tlati), 0.);//六角形の頂点
+				auto hexvertices = MakeHexagon(lensEdgeWidth);//六角形の頂点
 
 				//頂点を転送して描画
 				hexvertices.push_back(hexvertices.front());//一周するために最初の点を末尾に挿入
 				for (auto v : hexvertices) {
-					v = localPlaneToGrobal * v;
+					const auto localHeight=sqrt(1.-pow(v.norm()/nodeLensRadius,2.))*nodeLensRadius;//ローカル座標で高さを決める
+					v = localPlaneToGrobal * (v + uvec2(tlonn, tlati));
 					AppendPyVecSeries(pypltSeries, v);
 					const auto polarpos = MapToPolar(v);//つぎに極座標を得る
-					AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
+					AppendPyVecSeries(mlabSeries, Polar3DToXyz(uvec3(polarpos.x(), polarpos.y(), sphereRadius + localHeight)));
 				}
 
 				auto color = HsvToRgb({ uleap({0.,1.},ld / (ureal)lensNumInCollum),1.,0.5 });
