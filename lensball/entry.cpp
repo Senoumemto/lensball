@@ -152,16 +152,36 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 			for (std::decay<decltype(lensNumInCollum)>::type ld = 0; ld < lensNumInCollum; ld++) {
 				//六角形を収めるバッファをクリア
 				ResetPyVecSeries(pypltSeries);
-				ResetPyVecSeries(mlabSeries);
 
-				const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);//lonn方向の現在位置
+				//lonn方向の現在位置
+				const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
+				const auto localcenter = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
+
+				//要素レンズを描画していく
+				//まずは外形を計算する
 				auto hexvertices = MakeHexagon(lensEdgeWidth);//六角形の頂点
+				//つぎに極座標で要素レンズを計算する
+				std::list<uvec3> nodeLensVertices;
+				ResetPyVecSeries(mlabSeries);
+				for(std::decay<decltype(nodeLensResolution)>::type nlla = 0; nlla < nodeLensResolution; nlla++)
+					for (std::decay<decltype(nodeLensResolution)>::type nllo = 0; nllo < nodeLensResolution*2; nllo++) {
+						const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(nodeLensResolution * 2)),
+							uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(nodeLensResolution)));//要素レンズローカルでの極座標
+						//これが円になるはず
+						const uvec3 nodelensShape=nodeLensRadius* PolarToXyz(localpos);
+						const uvec2 nodelensGrobalMap = localPlaneToGrobal*(uvec2(nodelensShape.x(),nodelensShape.y()) + localcenter);//マップローカルでの要素レンズ
 
-				//頂点を転送して描画
+						const auto polarpos = MapToPolar(nodelensGrobalMap);//つぎにローカル極座標を得る
+						AppendPyVecSeries(mlabSeries, Polar3DToXyz(uvec3(polarpos.x(), polarpos.y(), sphereRadius)));
+					}
+
+				py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), 1., 1., 1.);
+				//頂点を転送して描
 				hexvertices.push_back(hexvertices.front());//一周するために最初の点を末尾に挿入
+				ResetPyVecSeries(mlabSeries);
 				for (auto v : hexvertices) {
 					const auto localHeight=sqrt(1.-pow(v.norm()/nodeLensRadius,2.))*nodeLensRadius;//ローカル座標で高さを決める
-					v = localPlaneToGrobal * (v + uvec2(tlonn, tlati));
+					v = localPlaneToGrobal * (v + localcenter);
 					AppendPyVecSeries(pypltSeries, v);
 					const auto polarpos = MapToPolar(v);//つぎに極座標を得る
 					AppendPyVecSeries(mlabSeries, Polar3DToXyz(uvec3(polarpos.x(), polarpos.y(), sphereRadius + localHeight)));
