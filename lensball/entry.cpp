@@ -144,6 +144,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 		const Eigen::Rotation2D<ureal> localPlaneToGrobal(rowAngle);
 
 		const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の直径
+		constexpr size_t nodeLensResolution = 10;//要素レンズの分割数
 		constexpr size_t rowNum = 15;//奇数にしてね
 		for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 			const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
