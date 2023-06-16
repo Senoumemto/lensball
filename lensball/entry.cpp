@@ -144,7 +144,7 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 		const Eigen::Rotation2D<ureal> localPlaneToGrobal(rowAngle);
 
 		const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の直径
-		constexpr size_t nodeLensResolution = 10;//要素レンズの分割数
+		constexpr size_t nodeLensResolution = 40;//要素レンズの分割数
 		constexpr size_t rowNum = 15;//奇数にしてね
 		for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 			const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
@@ -167,15 +167,18 @@ mlab.mesh(%f*x, %f*y, %f*z ,color=(1.,1.,1.) )
 					for (std::decay<decltype(nodeLensResolution)>::type nllo = 0; nllo < nodeLensResolution*2; nllo++) {
 						const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(nodeLensResolution * 2)),
 							uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(nodeLensResolution)));//要素レンズローカルでの極座標
-						//これが円になるはず
-						const uvec3 nodelensShape=nodeLensRadius* PolarToXyz(localpos);
+
+						const uvec3 nodelensShape=nodeLensRadius* PolarToXyz(localpos);//これが円になるはず
 						const uvec2 nodelensGrobalMap = localPlaneToGrobal*(uvec2(nodelensShape.x(),nodelensShape.y()) + localcenter);//マップローカルでの要素レンズ
 
+
 						const auto polarpos = MapToPolar(nodelensGrobalMap);//つぎにローカル極座標を得る
-						AppendPyVecSeries(mlabSeries, Polar3DToXyz(uvec3(polarpos.x(), polarpos.y(), sphereRadius)));
+						const auto localHeight = nodelensShape.z() * cos(polarpos.y());//ローカル座標で高さを決める
+						const auto globalpos = Polar3DToXyz(uvec3(polarpos.x(), polarpos.y(), sphereRadius + localHeight));//xyz座標系での位置を計算
+						AppendPyVecSeries(mlabSeries, globalpos);
 					}
 
-				py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), 1., 1., 1.);
+				py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.005)", GetPySeriesForPlot(mlabSeries), 1., 1., 1.);
 				//頂点を転送して描
 				hexvertices.push_back(hexvertices.front());//一周するために最初の点を末尾に挿入
 				ResetPyVecSeries(mlabSeries);
