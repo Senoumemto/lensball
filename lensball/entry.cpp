@@ -145,7 +145,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		const Eigen::Rotation2D<ureal> localPlaneToGrobal(rowAngle);
 
 		const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の直径
-		const std::pair<size_t,size_t> nodeLensResolution = make_pair(8*2,16);//要素レンズの分割数
+		const std::pair<size_t,size_t> nodeLensResolution = make_pair(5*2,8);//要素レンズの分割数
 		constexpr size_t rowNum = 15;//奇数にしてね
 		for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 			const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
@@ -172,7 +172,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					ResetPyVecSeries(mlabSeries);//mlabSeriesはグリッドの一行を格納する
 					for (std::decay<decltype(nodeLensResolution.first)>::type nllo = 0; nllo < nodeLensResolution.first; nllo++) {
 						const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(nodeLensResolution.first - 1)),
-							uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(nodeLensResolution.first - 1)));//要素レンズローカルでの極座標
+							uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(nodeLensResolution.second - 1)));//要素レンズローカルでの極座標
 
 						const uvec3 nodelensShape = nodeLensRadius * PolarToXyz(localpos);//これが円になるはず
 						const uvec2 nodelensGrobalMap = localPlaneToGrobal * (uvec2(nodelensShape.x(), nodelensShape.y()) + localcenter);//マップローカルでの要素レンズ
@@ -205,32 +205,19 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 		//スキャンをする
-		constexpr size_t projectorResInTheta = 40;
-		constexpr ureal projectorHalfAngle = 60. / 180. * pi;
-		constexpr size_t scanLineResolutionPhi = 180;
-		for (std::decay<decltype(projectorResInTheta)>::type sd = 0; sd < projectorResInTheta; sd++) {
-			//スキャンラインの高さ
-			const ureal scanTheta = uleap(PairMinusPlus(projectorHalfAngle), sd / (ureal)(projectorResInTheta - 1));
+		constexpr size_t projectorResInTheta = 40;//プロジェクタの縦がわ解像度
+		constexpr ureal projectorHalfAngle = 60. / 180. * pi;//プロジェクトの投映角
+		constexpr size_t numOfProjectionPerACycle = 720;//一回転での投影数
+		for (std::decay<decltype(numOfProjectionPerACycle)>::type rd = 0; rd < numOfProjectionPerACycle; rd++) {
+			const ureal ballRotation = uleap(make_pair(0., 2. * pi), rd / (ureal)(numOfProjectionPerACycle));//ボールの回転角度
+			for (std::decay<decltype(projectorResInTheta)>::type pd = 0; pd < projectorResInTheta; pd++) {//プロジェクタの注目画素
+				const ureal rayThetaInProjectorLocal = uleap(PairMinusPlus(projectorHalfAngle), pd / (ureal)(projectorResInTheta - 1));//プロジェクタ座標系での注目画素からでるレイのθ
 
-			//ラインを描画する
-			ResetPyVecSeries(mlabSeries);//x y z
-			ResetPyVecSeries(pypltSeries);
-			for (std::decay<decltype(scanLineResolutionPhi)>::type rd = 0; rd < scanLineResolutionPhi; rd++) {
-				const ureal time = uleap(PairMinusPlus(pi), rd / (ureal)(scanLineResolutionPhi - 1));
-
-				uvec2 mapped = PolarToMap(uvec2(time, scanTheta));
-				AppendPyVecSeries(pypltSeries, mapped);
-
-				//これをどうマップするか　極座標系で渡せばいいから
-				const auto polarpos = PolarToXyz(mapped);
-				AppendPyVecSeries(mlabSeries, polarpos);
+				const uvec2 rayDirInBallLocalPolar(-ballRotation, rayThetaInProjectorLocal);//ボールの回転角度画からボールローカルでのレイの方向(極座標がわかる)
+				//もちろん交点もここ
 			}
-
-			//plt
-			auto color = HsvToRgb({ uleap({0.,1.},sd / (ureal)projectorResInTheta),1.,0.5 });
-			py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
-			//py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 		}
+		
 
 		//表示する 3d 2dの順
 		py::s("plt.show()");
