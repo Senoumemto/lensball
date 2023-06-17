@@ -151,6 +151,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
 			const bool eachFlag = rd % 2;//交互に切り替わるフラグ
 			for (std::decay<decltype(lensNumInCollum)>::type ld = 0; ld < lensNumInCollum; ld++) {
+
+				auto color = HsvToRgb({ uleap({0.,1.},ld / (ureal)lensNumInCollum),1.,1. });//色を行方向に変える
 				//六角形を収めるバッファをクリア
 				ResetPyVecSeries(pypltSeries);
 
@@ -184,7 +186,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					py::s("nlx.append(mlabvx)\nnly.append(mlabvy)\nnlz.append(mlabvz)\n");//これでメッシュになると思うんやけど
 				}
 
-				py::sf("mlab.mesh(%s,color=(1,1,1))", GetPySeriesForPlot(nlensSeries));
+				py::sf("mlab.mesh(%s,color=(%f,%f,%f))", GetPySeriesForPlot(nlensSeries), color[0], color[1], color[2]);
 				//頂点を転送して描
 				hexvertices.push_back(hexvertices.front());//一周するために最初の点を末尾に挿入
 				ResetPyVecSeries(mlabSeries);
@@ -196,7 +198,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					AppendPyVecSeries(mlabSeries, Polar3DToXyz(uvec3(polarpos.x(), polarpos.y(), sphereRadius + localHeight)));
 				}
 
-				auto color = HsvToRgb({ uleap({0.,1.},ld / (ureal)lensNumInCollum),1.,0.5 });
 				py::sf("plt.plot(%s,color=(0,0,0))", GetPySeriesForPlot(pypltSeries));
 				py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 			}
