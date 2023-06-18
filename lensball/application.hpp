@@ -64,6 +64,8 @@ using arrow2 = arrow<2>;
 using arrow3 = arrow<3>;
 using arrow4 = arrow<4>;
 
+constexpr inline ureal pi = std::numbers::pi;//円周率のエイリアス
+
 //半直線をつなげたらレイになる、一連の折れ線を計算
 template<size_t SIZ>class ray:public std::list<arrow<SIZ>> {
 	using super = std::list<arrow<SIZ>>;
@@ -123,3 +125,66 @@ std::array<ureal, 3> HsvToRgb(const std::array<ureal, 3>& hsv);
 template<typename T> std::pair<T,T> PairMinusPlus(const T& t) {
 	return std::make_pair(-t, +t);
 }
+
+//座標系関係の関数
+//球面極座標を直交座標に変換 //
+uvec3 PolarToXyz(const uvec2& spolar);
+uvec3 Polar3DToXyz(const uvec3& phiThetaRadius);
+uvec2 MapToPolar(const uvec2& xy);
+uvec2 PolarToMap(const uvec2& xy);
+
+
+//pythonでベクトル系列を管理する
+
+//系列を表す 次元と名前
+template<size_t DIM>class pyVecSeries :public std::string {
+	using super = std::string;
+
+public:
+
+};
+
+//系列名を作成する
+template<size_t D> std::string GetSeriesPrefix(const unsigned char& id, std::optional<const std::reference_wrapper<std::array<const std::string, D>>>& prefixList) {
+	if (prefixList) {
+		std::array<const std::string, D>& ref = prefixList.value();
+		if (id < ref.size())return ref.at(id);
+	}
+	else if (id < 3)return { (char)('x' + id) };
+
+	throw std::runtime_error("This function(GetSeriesPrefix) arrows id be 0~2.");
+}
+//pythonでベクトル系列を作成する
+template<size_t D>void ResetPyVecSeries(const pyVecSeries<D>& vecname, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+	std::string ret;
+	for (size_t i = 0; i < D; i++)
+		ret += StringFormat("%s%s=[]\n", vecname.c_str(), GetSeriesPrefix<D>(i, prefix));
+
+	pythonRuntime::s(ret);
+}
+//pythonにベクトルをappendする
+template<typename VEC, size_t D = VEC::RowsAtCompileTime>void AppendPyVecSeries(const pyVecSeries<D>& vecname, const VEC& vec, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+	std::string ret;
+	for (size_t i = 0; i < D; i++)
+		ret += StringFormat("%s%s.append(%f)\n", vecname.c_str(), GetSeriesPrefix<D>(i, prefix), vec[i]);
+
+	pythonRuntime::s(ret);
+}
+//pythonでベクトル系列を,で列挙したものを得る 要素が0のベクトルだとバグる
+template<size_t D>std::string GetPySeriesForPlot(const pyVecSeries<D>& vecname, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+	std::string ret = StringFormat("%s%s", vecname.c_str(), GetSeriesPrefix<D>(0, prefix));
+	for (size_t i = 1; i < D; i++)
+		ret += StringFormat(",%s%s", vecname.c_str(), GetSeriesPrefix<D>(i, prefix));
+
+	return ret;
+}
+
+//二編幅から六角形を作る
+std::list<uvec2> MakeHexagon(const ureal& edgeWidth);
+
+
+
+
+
+
+

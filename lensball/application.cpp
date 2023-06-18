@@ -330,3 +330,40 @@ std::array<ureal, 3> HsvToRgb(const std::array<ureal, 3>& hsv) {
 	}
 	return rgb;
 }
+
+
+
+uvec3 PolarToXyz(const uvec2& spolar) {
+	return uvec3(cos(spolar.y()) * cos(spolar.x()),
+		cos(spolar.y()) * sin(spolar.x()),
+		sin(spolar.y()));
+}
+uvec3 Polar3DToXyz(const uvec3& phiThetaRadius) {
+	return uvec3(phiThetaRadius.z() * cos(phiThetaRadius.y()) * cos(phiThetaRadius.x()),
+		phiThetaRadius.z() * cos(phiThetaRadius.y()) * sin(phiThetaRadius.x()),
+		phiThetaRadius.z() * sin(phiThetaRadius.y()));
+}
+
+uvec2 MapToPolar(const uvec2& xy) {
+	return uvec2(xy.x(), 2. * atan(-pow(std::numbers::e, -xy.y())) + pi / 2.);
+}
+uvec2 PolarToMap(const uvec2& xy) {
+	return uvec2(xy.x(), -log(abs(tan(xy.y() / 2. - pi / 4.))));
+}
+
+//二編幅から六角形を作る
+std::list<uvec2> MakeHexagon(const ureal& edgeWidth) {
+	//外接球の半径を出したい
+	const ureal radius = 2. * edgeWidth / sqrt(3.);
+	std::list<uvec2> ret;
+
+	//点をぐるっと出していく
+	for (size_t i = 0; i < 6; i++) {
+		const auto t = uleap(PairMinusPlus(pi), i / 6.);
+
+		const uvec2 pos = radius * uvec2(sin(t), cos(t));
+		ret.push_back(pos);
+	}
+
+	return ret;
+}
