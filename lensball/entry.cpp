@@ -10,6 +10,30 @@ const std::string branchpath = "SphereCoord/";//このbranchの結果を格納するフォル
 
 using py = pythonRuntime;
 
+
+//要素レンズにある点が内包されているかどうかをチェックする
+bool NaihouHantei(const uvec2& p ,const std::list<uvec2>& vs) {
+	constexpr ureal naihouDist = 0.001;
+
+	auto ite =vs.cbegin();//末尾から一個前
+	ureal sumAngle = 0.;
+	for (size_t i = 0; i < 6;i++) {
+		//一つ次の頂点をチェック
+		auto nite = std::next(ite);
+
+		//ite pとp niteの角度を求める
+		const uvec2 e0 = (*ite - p).normalized(),
+			e1 = (*nite - p).normalized();
+		
+		sumAngle += acos(e0.dot(e1));
+		ite++;
+	}
+
+	//合計が2piか否か
+	if (fabs(2. * pi - fabs(sumAngle)) < naihouDist)return true;
+	return false;
+}
+
 int main() {
 
 	try {
@@ -61,7 +85,15 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		const ureal nodeLensRadiusSq = pow(nodeLensRadius, 2);//要素レンズ半径の二条
 		const std::pair<size_t,size_t> nodeLensResolution = make_pair(5*2,5);//要素レンズの分割数
 		constexpr size_t rowNum = 15;//奇数にしてね 行の数
-		{
+
+		//要素レンズの概形は六角形になるはず
+		auto hexverticesNodelensOuter = [&] {
+			auto hexvjunk = MakeHexagon(lensEdgeWidth);//六角形の頂点
+			hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
+
+			return hexvjunk;
+		}();
+		if(0){
 			//std::list<uleap>//マップ座標でのレンズ中心
 			for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 				const ureal tlati = eachRowsDistance * rd - (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//lati方向の現在位置
@@ -77,8 +109,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					const auto localcenter = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
 
 					//要素レンズを描画していく
-					//まずは外形を計算する
-					auto hexvertices = MakeHexagon(lensEdgeWidth);//六角形の頂点
+					
 					//つぎに極座標で要素レンズを計算する
 					std::list<uvec3> nodeLensVertices;
 					//ResetPyVecSeries(mlabSeries);
@@ -103,10 +134,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					}
 
 					py::sf("mlab.mesh(%s,color=(%f,%f,%f))", GetPySeriesForPlot(nlensSeries), color[0], color[1], color[2]);
-					//頂点を転送して描
-					hexvertices.push_back(hexvertices.front());//一周するために最初の点を末尾に挿入
+					//頂点を転送して描く
 					ResetPyVecSeries(mlabSeries);
-					for (const auto& v : hexvertices) {
+					for (const auto& v : hexverticesNodelensOuter) {
 						const uvec2 designedVertex = (v + localcenter);
 						const uvec2 vertex = DesignedMapToMap.prograte() * designedVertex;//傾けてマップ座標にする
 						AppendPyVecSeries(pypltSeries, designedVertex);
@@ -122,9 +152,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 		//スキャンをする
-		constexpr size_t projectorResInTheta = 2;//プロジェクタの縦がわ解像度
+		constexpr size_t projectorResInTheta = 7;//プロジェクタの縦がわ解像度
 		constexpr ureal projectorHalfAngle = 60. / 180. * pi;//プロジェクトの投映角
-		constexpr size_t numOfProjectionPerACycle = 2;//一回転での投影数
+		constexpr size_t numOfProjectionPerACycle = 7;//一回転での投影数
 		{
 			for (std::decay<decltype(numOfProjectionPerACycle)>::type rd = 0; rd < numOfProjectionPerACycle; rd++) {
 				const ureal ballRotation = uleap(make_pair(0., 2. * pi), rd / (ureal)(numOfProjectionPerACycle));//ボールの回転角度
@@ -134,7 +164,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					const uvec2 rayDirInBallLocalPolar(-ballRotation, rayThetaInProjectorLocal);//ボールの回転角度画からボールローカルでのレイの方向(極座標がわかる)
 					const uvec2 rayDirInBallLocalMap = PolarToMap(rayDirInBallLocalPolar);//マップ座標はここ 傾いたあと
 					const uvec2 rayDirInBallLocalMapDesigned = (DesignedMapToMap.untiprograte()) * rayDirInBallLocalMap;//傾ける前 デザインマップ
-					py::sf("plt.scatter(%f,%f,color=(0,%f,%f))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y(), rd / 1., pd / 1.);
+					py::sf("plt.scatter(%f,%f,color=(0,%f,%f))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y(), rd / (ureal)(numOfProjectionPerACycle-1), pd / (ureal)(projectorResInTheta-1));
 
 					//デザインマップのシータからrowがわかる
 					//const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
@@ -153,10 +183,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					
 					const int centerRawIndex = round(regRayDirLati);//四捨五入するともっともらしいインデックスがわかる
 					const int neibourRawIndex = (regRayDirLati - (ureal)centerRawIndex) > 0. ? centerRawIndex + 1 : centerRawIndex - 1;//隣り合う行のもっともらしいインデックスもわかる
-					printf("row index %d,%d\n", centerRawIndex, neibourRawIndex);
+					//printf("row index %d,%d\n", centerRawIndex, neibourRawIndex);
 					
 					//ではここから行中の当たり判定を始める
-					optional<uvec2> hitDistInMap;//接点とレンズの中心の差をレンズの半径で最適化したもの
+					optional<uvec2> hitDistRatioInMap;//接点とレンズの中心の差をレンズの半径で最適化したもの
 					for (const auto& rid : { centerRawIndex,neibourRawIndex }) {
 
 						//つぎにphiから何番目のレンズかを考える
@@ -175,28 +205,33 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 						const int centerLensIndex = round(regRayDirLonn - (eachFlag ? 0.5 : 0.));//これはオフセットがない　つまりよりマイナス側から始まっている行にいる場合のインデックス そうでなければ-0.5してから丸める←やりました
 						const int neibourLensIndex = (regRayDirLonn - (ureal)centerLensIndex) > 0. ? centerLensIndex + 1 : centerLensIndex - 1;//隣り合うレンズのもっともらしいインデックスもわかる
-						printf("lens index %d,%d\n", centerLensIndex, neibourLensIndex);
+						//printf("lens index %d,%d\n", centerLensIndex, neibourLensIndex);
 
 						//ではレンズの当たり判定を始める
 						for (const auto& lid : { centerLensIndex,neibourLensIndex }) {
 							//これでレンズの場所が確定するはず
 							const auto thiscenter = uvec2(uleap(PairMinusPlus(rowLength / 2.), lid / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.), eachRowsDistance * rid - (eachRowsDistance * (ureal)(rowNum - 1) / 2.));
+							const uvec2 hitDist = rayDirInBallLocalMapDesigned - thiscenter;//相対ヒット位置
+							//本当かしら とりあえず概形の中に入っているかどうかを判定
+							if (!NaihouHantei(hitDist, hexverticesNodelensOuter)) {
 
-							//本当かしら とりあえずレンズの直径内に入っているとおｋ
-							if ((rayDirInBallLocalMapDesigned - thiscenter).norm() <= nodeLensRadius) {
-								printf("ok r=%d l=%d\n", rid, lid);
-								hitDistInMap = (rayDirInBallLocalMapDesigned - thiscenter) / nodeLensRadius;
+								//printf("ok r=%d l=%d\n", rid, lid);
+
+								//とりあえずテスト　これがcenterでない可能性はあるの?
+								if (rid != centerRawIndex || lid != centerLensIndex)std::runtime_error("yayayaya!");
+
+								hitDistRatioInMap = hitDist / nodeLensRadius;
 								break;
 							}
 						}
 
-						if (hitDistInMap)break;
+						if (hitDistRatioInMap)break;
 					}
 
 					//ここまでで結果が出ないとやばい
-					if (!hitDistInMap)std::runtime_error("yavava");
+					if (!hitDistRatioInMap)std::runtime_error("yavava");
 
-					cout << hitDistInMap.value() << endl;
+					//cout << hitDistInMap.value() << endl;
 				}
 			}
 		};
