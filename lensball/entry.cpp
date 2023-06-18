@@ -49,6 +49,7 @@ int main() {
 
 			//pythonランタイムを準備していろいろ初期処理
 			py::Init();
+
 			py::s("import numpy as np\nfrom mayavi import mlab\nimport matplotlib.pyplot as plt");
 
 			//mayaviの設定
@@ -93,7 +94,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			return hexvjunk;
 		}();
-		if(0){
+		if(1){
 			//std::list<uleap>//マップ座標でのレンズ中心
 			for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 				const ureal tlati = eachRowsDistance * rd - (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//lati方向の現在位置
@@ -157,7 +158,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		constexpr size_t numOfProjectionPerACycle = 7;//一回転での投影数
 		{
 			for (std::decay<decltype(numOfProjectionPerACycle)>::type rd = 0; rd < numOfProjectionPerACycle; rd++) {
-				const ureal ballRotation = uleap(make_pair(0., 2. * pi), rd / (ureal)(numOfProjectionPerACycle));//ボールの回転角度
+				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
 				for (std::decay<decltype(projectorResInTheta)>::type pd = 0; pd < projectorResInTheta; pd++) {//プロジェクタの注目画素
 					const ureal rayThetaInProjectorLocal = uleap(PairMinusPlus(projectorHalfAngle), pd / (ureal)(projectorResInTheta - 1));//プロジェクタ座標系での注目画素からでるレイのθ
 
@@ -251,7 +252,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		return -2;
 	}
 
-
+	system("pause");//なんか入れたら終わり
 	py::Terminate();
 	return 0;
 }

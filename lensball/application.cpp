@@ -367,3 +367,48 @@ std::list<uvec2> MakeHexagon(const ureal& edgeWidth) {
 
 	return ret;
 }
+
+
+//ここからpythonRuntime
+safe_queue::safe_queue<std::string> pythonRuntime::combuffer;
+//コマンド処理スレッド
+uptr<std::thread> pythonRuntime::pyRunThread;
+
+std::atomic_bool pythonRuntime::FlagContiPyRun;
+
+void pythonRuntime::PyRunLoop() {
+
+	Py_Initialize();
+	while (FlagContiPyRun) {
+		try {
+			if (combuffer.empty())std::this_thread::sleep_for(std::chrono::microseconds(100));//なかったら一休み
+			else {
+				PyRun_SimpleString(combuffer.pop().get()->c_str());//実行
+			}
+		}
+		catch (std::exception& ex) {
+			cout << ex.what() << endl;
+		}
+	}
+	Py_Finalize();
+	return;
+}
+
+void pythonRuntime::Init() {
+	FlagContiPyRun = true;
+
+	pyRunThread.reset(new std::thread(PyRunLoop));
+
+}
+void pythonRuntime::Terminate() {
+	FlagContiPyRun = false;
+	pyRunThread->join();
+	pyRunThread.release();
+}
+
+void pythonRuntime::SendCommand(const std::string& command) {
+	combuffer.push(command);
+}
+void pythonRuntime::s(const std::string& s) {
+	SendCommand(s);
+}
