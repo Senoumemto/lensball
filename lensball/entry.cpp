@@ -57,7 +57,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		const ureal eachRowsDistance = 1.5 * rowLength / sqrt(3.) / (ureal)lensNumInCollum;//六角形の一変だけシフトする
 		const auto DesignedMapToMap = bitrans<Eigen::Rotation2D<ureal>>(Eigen::Rotation2D<ureal>(rowAngle));//レンズアレイを傾斜させる前から傾斜させたあとにする
 
-		const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の直径
+		const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の半径
+		const ureal nodeLensRadiusSq = pow(nodeLensRadius, 2);//要素レンズ半径の二条
 		const std::pair<size_t,size_t> nodeLensResolution = make_pair(5*2,5);//要素レンズの分割数
 		constexpr size_t rowNum = 15;//奇数にしてね 行の数
 		{
@@ -149,14 +150,53 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						return thisscale * zeroSetRayDir;
 					}();
 
-					//四捨五入するともっともらしいインデックスがわかる
-					const int centerRawIndex = round(regRayDirLati);
-					//隣り合う行のもっともらしいインデックスもわかる
-					const int neibourRawIndex = (regRayDirLati - (ureal)centerRawIndex) > 0. ? centerRawIndex + 1 : centerRawIndex - 1;
-					printf("%d,%d\n", centerRawIndex, neibourRawIndex);
-					// 
-					// 
-					//const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
+					
+					const int centerRawIndex = round(regRayDirLati);//四捨五入するともっともらしいインデックスがわかる
+					const int neibourRawIndex = (regRayDirLati - (ureal)centerRawIndex) > 0. ? centerRawIndex + 1 : centerRawIndex - 1;//隣り合う行のもっともらしいインデックスもわかる
+					printf("row index %d,%d\n", centerRawIndex, neibourRawIndex);
+					
+					//ではここから行中の当たり判定を始める
+					optional<uvec2> hitDistInMap;//接点とレンズの中心の差をレンズの半径で最適化したもの
+					for (const auto& rid : { centerRawIndex,neibourRawIndex }) {
+
+						//つぎにphiから何番目のレンズかを考える
+						const ureal regRayDirLonn = [&] {
+							//const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
+
+							const ureal zerothlenslonn = -rowLength / 2.;//-rowLength/2.が最初のレンズの位置　場合によって前後するけどね
+							const ureal zeroSetRayDir = rayDirInBallLocalMapDesigned.x() - zerothlenslonn;//zero番目のレンズの場所をzeroに
+							const ureal finlenslonn = uleap(PairMinusPlus(rowLength / 2.), (lensNumInCollum - 1) / (ureal)lensNumInCollum);//最後のレンズの場所
+							//スケーリング　fin~0までのスケールがlensNumInCollum-1~0までのスケールになって欲しい
+							const ureal thisscale = (ureal)(lensNumInCollum - 1 - 0) / (finlenslonn - zerothlenslonn);
+
+							return thisscale * zeroSetRayDir;
+						}();
+						const bool eachFlag = rid % 2;//交互に切り替わるフラグ 立っているときは行が半周進んでる
+
+						const int centerLensIndex = round(regRayDirLonn - (eachFlag ? 0.5 : 0.));//これはオフセットがない　つまりよりマイナス側から始まっている行にいる場合のインデックス そうでなければ-0.5してから丸める←やりました
+						const int neibourLensIndex = (regRayDirLonn - (ureal)centerLensIndex) > 0. ? centerLensIndex + 1 : centerLensIndex - 1;//隣り合うレンズのもっともらしいインデックスもわかる
+						printf("lens index %d,%d\n", centerLensIndex, neibourLensIndex);
+
+						//ではレンズの当たり判定を始める
+						for (const auto& lid : { centerLensIndex,neibourLensIndex }) {
+							//これでレンズの場所が確定するはず
+							const auto thiscenter = uvec2(uleap(PairMinusPlus(rowLength / 2.), lid / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.), eachRowsDistance * rid - (eachRowsDistance * (ureal)(rowNum - 1) / 2.));
+
+							//本当かしら とりあえずレンズの直径内に入っているとおｋ
+							if ((rayDirInBallLocalMapDesigned - thiscenter).norm() <= nodeLensRadius) {
+								printf("ok r=%d l=%d\n", rid, lid);
+								hitDistInMap = (rayDirInBallLocalMapDesigned - thiscenter) / nodeLensRadius;
+								break;
+							}
+						}
+
+						if (hitDistInMap)break;
+					}
+
+					//ここまでで結果が出ないとやばい
+					if (!hitDistInMap)std::runtime_error("yavava");
+
+					cout << hitDistInMap.value() << endl;
 				}
 			}
 		};
