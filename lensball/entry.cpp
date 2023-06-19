@@ -62,7 +62,7 @@ int main() {
 			py::sf("fig = mlab.figure( size=(%d,%d), bgcolor=(0,0,0) )", figResolution.first, figResolution.second);
 
 			//matplotlibの設定
-			py::s("fig, ax = plt.subplots()\nax.set_aspect(\"equal\")");
+			py::s("fig, ax = plt.subplots()\nax.set_aspect(\"equal\")\nplt.title('Fraction Direction')");
 
 			//球を描画する
 			constexpr size_t sphereResolution = 20;
@@ -150,7 +150,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
 					}
 
-					py::sf("plt.plot(%s,color=(0,0,0))", GetPySeriesForPlot(pypltSeries));
+					//py::sf("plt.plot(%s,color=(0,0,0))", GetPySeriesForPlot(pypltSeries));
 					py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 				}
 			}
@@ -165,6 +165,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		{
 			for (std::decay<decltype(numOfProjectionPerACycle)>::type rd = 0; rd < numOfProjectionPerACycle; rd++) {
 				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
+				const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
+
 				for (std::decay<decltype(projectorResInTheta)>::type pd = 0; pd < projectorResInTheta; pd++) {//プロジェクタの注目画素
 					const ureal rayThetaInProjectorLocal = uleap(PairMinusPlus(projectorHalfAngle), pd / (ureal)(projectorResInTheta - 1));//プロジェクタ座標系での注目画素からでるレイのθ
 
@@ -172,6 +174,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					const uvec2 rayDirInBallLocalMap = PolarToMap(rayDirInBallLocalPolar);//マップ座標はここ 傾いたあと
 					const uvec2 rayDirInBallLocalMapDesigned = (DesignedMapToMap.untiprograte()) * rayDirInBallLocalMap;//傾ける前 デザインマップ
 					
+
+					//py::sf("plt.scatter(%f,%f,color=(0,0,0))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y());
 					//デザインマップのシータからrowがわかる
 					//const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
 					//シータは-eachRowsDistance*(ureal)(rowNum-1)/2~eachRowDistance*(rownum-1)/2まで
@@ -219,8 +223,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 							const auto thiscenter = uvec2(uleap(PairMinusPlus(rowLength / 2.), lid / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.), eachRowsDistance * rid - (eachRowsDistance * (ureal)(rowNum - 1) / 2.));
 							const uvec2 hitDist = rayDirInBallLocalMapDesigned - thiscenter;//相対ヒット位置
 							//本当かしら とりあえず概形の中に入っているかどうかを判定
-							if (!NaihouHantei(hitDist, hexverticesNodelensOuter)) {
-
+							if (NaihouHantei(hitDist, hexverticesNodelensOuter)) {
+								if (hitDist.norm() >= nodeLensRadius)throw logic_error("判定がだめ");
 								//printf("ok r=%d l=%d\n", rid, lid);
 
 								//とりあえずテスト　これがcenterでない可能性はあるの?
@@ -242,9 +246,14 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 					const auto hitPosXYZLocal = PolarToXyz(rayDirInBallLocalPolar);
 					const auto refractRayDirXYZLocal = (focalposXYZLocal-hitPosXYZLocal).normalized();//衝突点と焦点の位置が分かれば光の方向がわかるね　暫定的に
+					//これをグローバルに戻す
+					const uvec3 refractRayDir = GlobalToBallLocal.untiprograte() * refractRayDirXYZLocal;
 
 					//プロットします　ヒットポイントに色別で
-					py::sf("plt.scatter(%f,%f,color=(%f,%f,%f))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y(), fabs(refractRayDirXYZLocal.x()), fabs(refractRayDirXYZLocal.y()), fabs(refractRayDirXYZLocal.z()));
+
+					//見たい画素なら
+					if (pd == 0)
+						py::sf("plt.scatter(%f,%f,color=(0,0,0))", hitLensCenterAndHitDist.value().second.x(), hitLensCenterAndHitDist.value().second.y());
 
 				}
 			}
