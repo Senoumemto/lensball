@@ -344,7 +344,7 @@ uvec3 Polar3DToXyz(const uvec3& phiThetaRadius) {
 		phiThetaRadius.z() * sin(phiThetaRadius.y()));
 }
 
-uvec2 MapToPolar(const uvec2& xy) {
+uvec2 MapToLocalPolar(const uvec2& xy) {
 	return uvec2(xy.x(), 2. * atan(-pow(std::numbers::e, -xy.y())) + pi / 2.);
 }
 uvec2 PolarToMap(const uvec2& xy) {

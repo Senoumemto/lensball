@@ -130,7 +130,7 @@ template<typename T> std::pair<T,T> PairMinusPlus(const T& t) {
 //球面極座標を直交座標に変換 //
 uvec3 PolarToXyz(const uvec2& spolar);
 uvec3 Polar3DToXyz(const uvec3& phiThetaRadius);
-uvec2 MapToPolar(const uvec2& xy);
+uvec2 MapToLocalPolar(const uvec2& xy);
 uvec2 PolarToMap(const uvec2& xy);
 
 
@@ -144,10 +144,13 @@ public:
 
 };
 
+//系列リスト
+template<size_t D>using prefixlist = std::optional<const std::reference_wrapper<const std::array<const std::string, D>>>;
+
 //系列名を作成する
-template<size_t D> std::string GetSeriesPrefix(const unsigned char& id, std::optional<const std::reference_wrapper<std::array<const std::string, D>>>& prefixList) {
+template<size_t D> std::string GetSeriesPrefix(const unsigned char& id, const prefixlist<D> prefixList) {
 	if (prefixList) {
-		std::array<const std::string, D>& ref = prefixList.value();
+		const std::array<const std::string, D>& ref = prefixList.value();
 		if (id < ref.size())return ref.at(id);
 	}
 	else if (id < 3)return { (char)('x' + id) };
@@ -155,7 +158,7 @@ template<size_t D> std::string GetSeriesPrefix(const unsigned char& id, std::opt
 	throw std::runtime_error("This function(GetSeriesPrefix) arrows id be 0~2.");
 }
 //pythonでベクトル系列を作成する
-template<size_t D>void ResetPyVecSeries(const pyVecSeries<D>& vecname, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+template<size_t D>void ResetPyVecSeries(const pyVecSeries<D>& vecname, const prefixlist<D> prefix = std::nullopt) {
 	std::string ret;
 	for (size_t i = 0; i < D; i++)
 		ret += StringFormat("%s%s=[]\n", vecname.c_str(), GetSeriesPrefix<D>(i, prefix));
@@ -163,7 +166,7 @@ template<size_t D>void ResetPyVecSeries(const pyVecSeries<D>& vecname, std::opti
 	pythonRuntime::s(ret);
 }
 //pythonにベクトルをappendする
-template<typename VEC, size_t D = VEC::RowsAtCompileTime>void AppendPyVecSeries(const pyVecSeries<D>& vecname, const VEC& vec, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+template<typename VEC, size_t D = VEC::RowsAtCompileTime>void AppendPyVecSeries(const pyVecSeries<D>& vecname, const VEC& vec, const prefixlist<D> prefix = std::nullopt) {
 	std::string ret;
 	for (size_t i = 0; i < D; i++)
 		ret += StringFormat("%s%s.append(%f)\n", vecname.c_str(), GetSeriesPrefix<D>(i, prefix), vec[i]);
@@ -171,7 +174,7 @@ template<typename VEC, size_t D = VEC::RowsAtCompileTime>void AppendPyVecSeries(
 	pythonRuntime::s(ret);
 }
 //pythonでベクトル系列を,で列挙したものを得る 要素が0のベクトルだとバグる
-template<size_t D>std::string GetPySeriesForPlot(const pyVecSeries<D>& vecname, std::optional<const std::reference_wrapper<std::array<const std::string, D>>> prefix = std::nullopt) {
+template<size_t D>std::string GetPySeriesForPlot(const pyVecSeries<D>& vecname, const prefixlist<D> prefix = std::nullopt) {
 	std::string ret = StringFormat("%s%s", vecname.c_str(), GetSeriesPrefix<D>(0, prefix));
 	for (size_t i = 1; i < D; i++)
 		ret += StringFormat(",%s%s", vecname.c_str(), GetSeriesPrefix<D>(i, prefix));
