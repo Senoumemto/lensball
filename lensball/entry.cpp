@@ -280,11 +280,15 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
+		system("pause");//‚È‚ñ‚©“ü‚ê‚½‚çI‚í‚è
+
 		py::Terminate();
 		return -1;
 	}
 	catch (...) {
 		cout << "unknown err" << endl;
+		system("pause");//‚È‚ñ‚©“ü‚ê‚½‚çI‚í‚è
+
 		py::Terminate();
 		return -2;
 	}
