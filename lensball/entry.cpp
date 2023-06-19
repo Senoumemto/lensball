@@ -53,7 +53,7 @@ int main() {
 		const pyVecSeries<6> quiverSeries("mlabquiver");//ベクトル場用
 		const std::array<const string, 6> quiverPrefix = { "x","y","z","a","b","c" };
 
-
+		constexpr bool drawSphere = true;//レンズボール概形を描画する
 		//Pythonをセットアップしてからレンズボールの概形を書く
 		constexpr ureal sphereRadius = 1.;
 		{
@@ -72,13 +72,13 @@ int main() {
 
 			//球を描画する
 			constexpr size_t sphereResolution = 20;
-			/*py::sf(R"(
+			if (drawSphere)py::sf(R"(
 [sphphi,sphtheta] = np.mgrid[0:2*np.pi:%dj,0:np.pi:%dj]
 spx = np.cos(sphphi)*np.sin(sphtheta)
 spy = np.sin(sphphi)*np.sin(sphtheta)
 spz = np.cos(sphtheta)
 mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )  
-)", sphereResolution, sphereResolution, sphereRadius, sphereRadius, sphereRadius);*/
+)", sphereResolution, sphereResolution, sphereRadius, sphereRadius, sphereRadius);
 		};
 
 
@@ -105,7 +105,11 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			return hexvjunk;
 		}();
-		if(0){
+
+		constexpr bool calcNodelenses = true;//ノードレンズの位置を計算してレンズボールを形成する
+		constexpr bool drawNodelenses = calcNodelenses & true;//要素レンズを描画する
+		constexpr bool drawNodelensEdges = calcNodelenses & true;//ノードレンズの枠線を描画する
+		if(calcNodelenses){
 			//std::list<uleap>//マップ座標でのレンズ中心
 			for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 				const ureal tlati = eachRowsDistance * rd - (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//lati方向の現在位置
@@ -118,13 +122,14 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 					//lonn方向の現在位置
 					const ureal tlonn = uleap(PairMinusPlus(rowLength / 2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
-					const auto localcenter = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
+					const auto localcenterInMapDesigned = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
+					const auto localcenterInMap = DesignedMapToMap.prograte() * localcenterInMapDesigned;
+					const auto localcenterInBalllocalPolar = MapToLocalPolar(localcenterInMap);
+					const uvec3 localcenterInBalllocal = PolarToXyz(localcenterInBalllocalPolar);
 
 					//要素レンズを描画していく
 					
 					//つぎに極座標で要素レンズを計算する
-					std::list<uvec3> nodeLensVertices;
-					//ResetPyVecSeries(mlabSeries);
 					ResetPyVecSeries(nlensSeries);//ノードレンズ
 					for (std::decay<decltype(nodeLensResolution.second)>::type nlla = 0; nlla < nodeLensResolution.second; nlla++) {
 
@@ -133,31 +138,25 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 							const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(nodeLensResolution.first - 1)),
 								uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(nodeLensResolution.second - 1)));//要素レンズローカルでの極座標
 
-							const uvec3 nodelensShape = nodeLensRadius * PolarToXyz(localpos);//これが円になるはず
-							const uvec2 nodelensGrobalMap = (DesignedMapToMap.prograte()) * (uvec2(nodelensShape.x(), nodelensShape.y()) + localcenter);//マップローカルでの要素レンズ
-
-
-							const auto polarpos = MapToLocalPolar(nodelensGrobalMap);//つぎにローカル極座標を得る
-							const auto localHeight = nodelensShape.z() * cos(polarpos.y());//ローカル座標で高さを決める
-							const auto globalpos = Polar3DToXyz(uvec3(polarpos.x(), polarpos.y(), sphereRadius + localHeight));//xyz座標系での位置を計算
-							AppendPyVecSeries(mlabSeries, globalpos);
+							const uvec3 nodelensShape = (nodeLensRadius * fabs(cos(localcenterInBalllocalPolar.y()))) * PolarToXyz(localpos);//これが球になるはず
+							AppendPyVecSeries(mlabSeries, nodelensShape + localcenterInBalllocal);
 						}
-						py::s("nlx.append(mlabvx)\nnly.append(mlabvy)\nnlz.append(mlabvz)\n");//これでメッシュになると思うんやけど
+						if (drawNodelenses)py::s("nlx.append(mlabvx)\nnly.append(mlabvy)\nnlz.append(mlabvz)\n");//これでメッシュになると思うんやけど
 					}
 
-					py::sf("mlab.mesh(%s,color=(%f,%f,%f))", GetPySeriesForPlot(nlensSeries), color[0], color[1], color[2]);
+					if (drawNodelenses)py::sf("mlab.mesh(%s,color=(%f,%f,%f))", GetPySeriesForPlot(nlensSeries), color[0], color[1], color[2]);
 					//頂点を転送して描く
 					ResetPyVecSeries(mlabSeries);
 					for (const auto& v : hexverticesNodelensOuter) {
-						const uvec2 designedVertex = (v + localcenter);
+						const uvec2 designedVertex = (v + localcenterInMapDesigned);
 						const uvec2 vertex = DesignedMapToMap.prograte() * designedVertex;//傾けてマップ座標にする
 						AppendPyVecSeries(pypltSeries, designedVertex);
 						const auto polarpos = MapToLocalPolar(vertex);//つぎに極座標を得る
 						AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
 					}
 
-					//py::sf("plt.plot(%s,color=(0,0,0))", GetPySeriesForPlot(pypltSeries));
-					py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
+					if (drawNodelensEdges)py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
+					if (drawNodelensEdges)py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
 				}
 			}
 		};
@@ -168,7 +167,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		constexpr ureal projectorHalfAngle = 60. / 180. * pi;//プロジェクトの投映角
 		constexpr size_t numOfProjectionPerACycle = 720;//一回転での投影数
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
-		{
+
+		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
+		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
+		if(scanLenses){
 			ResetPyVecSeries<6>(quiverSeries,quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
 
@@ -259,23 +261,18 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					const uvec3 refractRayDirInGlobal = GlobalToBallLocal.untiprograte() * refractRayDirInBalllocalXYZ;
 
 					//プロットします　ヒットポイントに
-					if (pd == 0) {
+					if (pd == 0 && drawRefractionDirectionOfARay) {
 						const auto color = HsvToRgb({ rd / (ureal)(numOfProjectionPerACycle - 1),1.,1. });
-						//AppendPyVecSeries<uvec6, 6>(quiverSeries, ArrowToUVec6(arrow3(uvec3(0, 0, 0), refractRayDirInBalllocalXYZ)), quiverPrefix);
-						//AppendPyVecSeries(pypltSeries, hitLensCenterAndHitDistInMapDesigned.value().second);
-						py::sf("mlab.quiver3d(0,0,0,%f,%f,%f,mode=\"arrow\",color=(%f,%f,%f))", refractRayDirInGlobal.x(), refractRayDirInGlobal.y(), refractRayDirInGlobal.z(), color[0],color[1],color[2]);
+						py::sf("mlab.quiver3d(0,0,0,%f,%f,%f,mode=\"arrow\",color=(%f,%f,%f))", refractRayDirInGlobal.x(), refractRayDirInGlobal.y(), refractRayDirInGlobal.z(), color[0], color[1], color[2]);
 						py::sf("plt.scatter(%f,%f,color=(%f,%f,%f))", hitLensCenterAndHitDistInMapDesigned.value().second.x(), hitLensCenterAndHitDistInMapDesigned.value().second.y(), color[0], color[1], color[2]);
 					}
 				}
 			}
-
-			//最後に描画
-			//py::sf("mlab.quiver3d(%s,mode=\"arrow\")", GetPySeriesForPlot<6>(quiverSeries, quiverPrefix));
-			//py::sf("plt.scatter(%s,color=(0,0,0))",GetPySeriesForPlot(pypltSeries));
 		};
 		
 
 		//表示する 3d 2dの順
+		py::s("mlab.show()");
 		py::s("plt.show()");
 	}
 	catch (std::exception& ex) {
