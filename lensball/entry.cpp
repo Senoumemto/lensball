@@ -290,7 +290,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		return -2;
 	}
 
-	system("pause");//‚È‚ñ‚©“ü‚ê‚½‚çI‚í‚è
 	py::Terminate();
 	return 0;
 }

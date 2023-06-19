@@ -379,7 +379,8 @@ std::atomic_bool pythonRuntime::FlagContiPyRun;
 void pythonRuntime::PyRunLoop() {
 
 	Py_Initialize();
-	while (FlagContiPyRun) {
+
+	while (FlagContiPyRun||!combuffer.empty()) {
 		try {
 			if (combuffer.empty())std::this_thread::sleep_for(std::chrono::microseconds(100));//‚È‚©‚Á‚½‚çˆê‹x‚Ý
 			else {
@@ -390,6 +391,7 @@ void pythonRuntime::PyRunLoop() {
 			cout << ex.what() << endl;
 		}
 	}
+
 	Py_Finalize();
 	return;
 }
