@@ -34,6 +34,11 @@ bool NaihouHantei(const uvec2& p ,const std::list<uvec2>& vs) {
 	return false;
 }
 
+//2dベクトルに要素を加える
+uvec3 ExtendUvec2(const uvec2& v, const ureal& z) {
+	return uvec3(v.x(), v.y(), z);
+}
+
 int main() {
 
 	try {
@@ -153,9 +158,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 		//スキャンをする
-		constexpr size_t projectorResInTheta = 7;//プロジェクタの縦がわ解像度
+		constexpr size_t projectorResInTheta = 2;//プロジェクタの縦がわ解像度
 		constexpr ureal projectorHalfAngle = 60. / 180. * pi;//プロジェクトの投映角
-		constexpr size_t numOfProjectionPerACycle = 7;//一回転での投影数
+		constexpr size_t numOfProjectionPerACycle = 720;//一回転での投影数
+		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 		{
 			for (std::decay<decltype(numOfProjectionPerACycle)>::type rd = 0; rd < numOfProjectionPerACycle; rd++) {
 				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
@@ -165,8 +171,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					const uvec2 rayDirInBallLocalPolar(-ballRotation, rayThetaInProjectorLocal);//ボールの回転角度画からボールローカルでのレイの方向(極座標がわかる)
 					const uvec2 rayDirInBallLocalMap = PolarToMap(rayDirInBallLocalPolar);//マップ座標はここ 傾いたあと
 					const uvec2 rayDirInBallLocalMapDesigned = (DesignedMapToMap.untiprograte()) * rayDirInBallLocalMap;//傾ける前 デザインマップ
-					py::sf("plt.scatter(%f,%f,color=(0,%f,%f))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y(), rd / (ureal)(numOfProjectionPerACycle-1), pd / (ureal)(projectorResInTheta-1));
-
+					
 					//デザインマップのシータからrowがわかる
 					//const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
 					//シータは-eachRowsDistance*(ureal)(rowNum-1)/2~eachRowDistance*(rownum-1)/2まで
@@ -187,7 +192,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					//printf("row index %d,%d\n", centerRawIndex, neibourRawIndex);
 					
 					//ではここから行中の当たり判定を始める
-					optional<uvec2> hitDistRatioInMap;//接点とレンズの中心の差をレンズの半径で最適化したもの
+					optional<std::pair<uvec2, uvec2>> hitLensCenterAndHitDist;//対象のレンズの中心位置
 					for (const auto& rid : { centerRawIndex,neibourRawIndex }) {
 
 						//つぎにphiから何番目のレンズかを考える
@@ -221,18 +226,26 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 								//とりあえずテスト　これがcenterでない可能性はあるの?
 								if (rid != centerRawIndex || lid != centerLensIndex)std::runtime_error("yayayaya!");
 
-								hitDistRatioInMap = hitDist / nodeLensRadius;
+								hitLensCenterAndHitDist = make_pair(thiscenter, hitDist);
 								break;
 							}
 						}
 
-						if (hitDistRatioInMap)break;
+						if (hitLensCenterAndHitDist)break;
 					}
 
 					//ここまでで結果が出ないとやばい
-					if (!hitDistRatioInMap)std::runtime_error("yavava");
+					if (!hitLensCenterAndHitDist)std::runtime_error("要素レンズの検索に失敗");
 
-					//cout << hitDistInMap.value() << endl;
+					//焦点の場所は要素レンズが確定すれば計算できる
+					const auto focalposXYZLocal = Polar3DToXyz(ExtendUvec2(MapToPolar(hitLensCenterAndHitDist.value().first), sphereRadius + nodeLensFocalLength));
+
+					const auto hitPosXYZLocal = PolarToXyz(rayDirInBallLocalPolar);
+					const auto refractRayDirXYZLocal = (focalposXYZLocal-hitPosXYZLocal).normalized();//衝突点と焦点の位置が分かれば光の方向がわかるね　暫定的に
+
+					//プロットします　ヒットポイントに色別で
+					py::sf("plt.scatter(%f,%f,color=(%f,%f,%f))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y(), fabs(refractRayDirXYZLocal.x()), fabs(refractRayDirXYZLocal.y()), fabs(refractRayDirXYZLocal.z()));
+
 				}
 			}
 		};
