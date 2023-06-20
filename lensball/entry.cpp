@@ -187,26 +187,29 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		//スキャンをする
 		constexpr size_t projectorResInTheta = 768;//プロジェクタの縦がわ解像度
 		constexpr ureal projectorHalfAngleTheta = 60. / 180. * pi;//プロジェクトの投映角
-		constexpr size_t projectorResInPhi = 1024;
+		constexpr size_t projectorResInPhi = 100;
 		constexpr ureal projectorHalfAnglePhi = projectorHalfAngleTheta * (projectorResInPhi / (ureal)projectorResInTheta);//プロジェクトの投映角
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 
+		//レンズボールからどのようなレイが出るのか　そのレイはプロジェクタのどこと(h,v,t)対応づくのか
+		//std::unordered_map<Eigen::Vector3i, arrow3> projectorRefractRayMap;
+
 		constexpr size_t scanThreadNum = 19;//スキャンに使うスレッド数
 		std::array<uptr<std::thread>, scanThreadNum> scanThreads;//実行スレッド
-		std::array<std::atomic_bool, scanThreadNum> scanThreadIsFin;//すきゃんがおわったことを報告
+		std::array<std::unordered_map<Eigen::Vector3i, arrow3>, scanThreadNum> resultOfEachScanThread;//各スレッドごとに結果をためていく
+		std::array<bool, scanThreadNum> scanThreadIsFin;//スキャンがおわったことを報告
 
 		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		constexpr bool logWarningInScan = false;//scan中の警告を表示する
 
-		//レイの向きと
 
 		if(scanLenses){
 			ResetPyVecSeries<6>(quiverSeries,quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
 
 			//回転角度ごとにスレッドを割り付ける
-			const auto scanAScene = [&](const std::decay<decltype(numOfProjectionPerACycle)>::type rd, decltype(scanThreadIsFin)::iterator finflag) {
+			const auto scanAScene = [&](const std::decay<decltype(numOfProjectionPerACycle)>::type rd, decltype(resultOfEachScanThread)::iterator rezoyaret, decltype(scanThreadIsFin)::iterator finflag) {
 
 				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
 				const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
@@ -216,6 +219,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 					for (std::decay<decltype(projectorResInTheta)>::type vpd = 0; vpd < projectorResInTheta; vpd++) {//プロジェクタの注目画素ごとに
 						const ureal rayThetaInGlobal = uleap(PairMinusPlus(projectorHalfAngleTheta), vpd / (ureal)(projectorResInTheta - 1));//プロジェクタ座標系での注目画素からでるレイのθ
+						const uvec3 rayDirInGlobal = PolarToXyz(uvec2(rayPhiInGlobal, rayThetaInGlobal));
 
 						const uvec2 rayDirInBallInBalllocalPolar(rayPhiInGlobal - ballRotation, rayThetaInGlobal);//ボールの回転角度画からボールローカルでのレイの方向(極座標がわかる)
 						const uvec2 rayDirInMap = PolarToMap(rayDirInBallInBalllocalPolar);//マップ座標はここ 傾いたあと
@@ -297,6 +301,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						//これをグローバルに戻す
 						const uvec3 refractRayDirInGlobal = GlobalToBallLocal.untiprograte() * refractRayDirInBalllocalXYZ;
 
+						//結果を追加
+						(*rezoyaret)[Eigen::Vector3i(hpd, vpd, rd)] = arrow3(rayDirInGlobal, refractRayDirInGlobal);
+
 						//プロットします　ヒットポイントに
 						if (vpd == 0 && drawRefractionDirectionOfARay) {
 							const auto color = HsvToRgb({ rd / (ureal)(numOfProjectionPerACycle - 1),1.,1. });
@@ -317,9 +324,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						if (!scanThreads.at(t)) {//空きなら割付
 							if (!isfound) {//一つのインデックスには一回だけ割り付ける
 								isfound = true;
-								scanThreadIsFin.at(t) = false;//フラグをセット
+								scanThreadIsFin.at(t) = false;//結果をクリアして
 
-								scanThreads.at(t).reset(new std::thread(scanAScene, rdgen, scanThreadIsFin.begin() + t));//スレッド実行開始
+								scanThreads.at(t).reset(new std::thread(scanAScene, rdgen, resultOfEachScanThread.begin() + t, scanThreadIsFin.begin() + t));//スレッド実行開始
 							}
 						}
 						else if (scanThreadIsFin.at(t)) {//空いてなくて終わってるなら

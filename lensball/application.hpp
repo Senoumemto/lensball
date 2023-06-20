@@ -40,6 +40,8 @@ public:
 	arrow& operator=(const arrow& val) {
 		this->org() = val.org();
 		this->dir() = val.dir();
+
+		return *this;
 	}
 
 
