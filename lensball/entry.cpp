@@ -58,6 +58,9 @@ template < typename T > constexpr T sqrt_constexpr(T s){
 int main() {
 
 	try {
+		const auto startTimePoint = std::chrono::system_clock::now();
+		cout << "Start: " << startTimePoint << endl;
+
 		//python plt用のベクトル系列名
 		const pyVecSeries<3> mlabSeries("mlabv");//mlabプロット用に使う3Dベクトル配列
 		const pyVecSeries<3> nlensSeries("nl");//要素レンズのグリッド
@@ -182,8 +185,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 		//スキャンをする
-		constexpr size_t projectorResInTheta = 720;//プロジェクタの縦がわ解像度
-		constexpr ureal projectorHalfAngle = 60. / 180. * pi;//プロジェクトの投映角
+		constexpr size_t projectorResInTheta = 768;//プロジェクタの縦がわ解像度
+		constexpr ureal projectorHalfAngleTheta = 60. / 180. * pi;//プロジェクトの投映角
+		constexpr size_t projectorResInPhi = 1024;
+		constexpr ureal projectorHalfAnglePhi = projectorHalfAngleTheta * (projectorResInPhi / (ureal)projectorResInTheta);//プロジェクトの投映角
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 
 		constexpr size_t scanThreadNum = 19;//スキャンに使うスレッド数
@@ -191,8 +196,11 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		std::array<std::atomic_bool, scanThreadNum> scanThreadIsFin;//すきゃんがおわったことを報告
 
 		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
-		constexpr bool drawRefractionDirectionOfARay = true;//あるレイの屈折方向を描画する
+		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		constexpr bool logWarningInScan = false;//scan中の警告を表示する
+
+		//レイの向きと
+
 		if(scanLenses){
 			ResetPyVecSeries<6>(quiverSeries,quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
@@ -203,97 +211,100 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
 				const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
 
-				for (std::decay<decltype(projectorResInTheta)>::type pd = 0; pd < projectorResInTheta; pd++) {//プロジェクタの注目画素ごとに
-					const ureal rayThetaInGlobal = uleap(PairMinusPlus(projectorHalfAngle), pd / (ureal)(projectorResInTheta - 1));//プロジェクタ座標系での注目画素からでるレイのθ
+				for (std::decay<decltype(projectorResInPhi)>::type hpd = 0; hpd < projectorResInPhi; hpd++) {
+					const ureal rayPhiInGlobal = uleap(PairMinusPlus(projectorHalfAnglePhi), hpd / (ureal)(projectorResInPhi - 1));//プロジェクタ座標系での注目画素からでるレイのφ
 
-					const uvec2 rayDirInBallInBalllocalPolar(-ballRotation, rayThetaInGlobal);//ボールの回転角度画からボールローカルでのレイの方向(極座標がわかる)
-					const uvec2 rayDirInMap = PolarToMap(rayDirInBallInBalllocalPolar);//マップ座標はここ 傾いたあと
-					const uvec2 rayDirInMapDesigned = (DesignedMapToMap.untiprograte()) * rayDirInMap;//傾ける前 デザインマップ
+					for (std::decay<decltype(projectorResInTheta)>::type vpd = 0; vpd < projectorResInTheta; vpd++) {//プロジェクタの注目画素ごとに
+						const ureal rayThetaInGlobal = uleap(PairMinusPlus(projectorHalfAngleTheta), vpd / (ureal)(projectorResInTheta - 1));//プロジェクタ座標系での注目画素からでるレイのθ
 
-
-					//py::sf("plt.scatter(%f,%f,color=(0,0,0))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y());
-					//デザインマップのシータからrowがわかる
-					//const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
-					//シータは-eachRowsDistance*(ureal)(rowNum-1)/2~eachRowDistance*(rownum-1)/2まで
-					//まずrayDirInMapDのlatitudeを正規化する 一番下のrowの高さちょうどのとき 0　一番上のrowの高さちょうどのときrowNum-1になるようにする
-					const ureal regRayDirLati = [&] {
-						const ureal zerothRowlati = -(eachRowsDistance * (ureal)(rowNum - 1) / 2.);//zero番目の行の高さ
-						const ureal zeroSetRayDir = rayDirInMapDesigned.y() - zerothRowlati;//0番目の行の高さに始点を合わせたレイの高さ
-						const ureal finalRowlati = (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//rowNum-1番目の行の高さ
-						//スケーリング　fin~0までのスケールがrowNum-1~0までのスケールになって欲しい
-						const ureal thisscale = (ureal)(rowNum - 1 - 0) / (finalRowlati - zerothRowlati);
-
-						return thisscale * zeroSetRayDir;
-					}();
+						const uvec2 rayDirInBallInBalllocalPolar(rayPhiInGlobal - ballRotation, rayThetaInGlobal);//ボールの回転角度画からボールローカルでのレイの方向(極座標がわかる)
+						const uvec2 rayDirInMap = PolarToMap(rayDirInBallInBalllocalPolar);//マップ座標はここ 傾いたあと
+						const uvec2 rayDirInMapDesigned = (DesignedMapToMap.untiprograte()) * rayDirInMap;//傾ける前 デザインマップ
 
 
-					const int centerRawIndex = round(regRayDirLati);//四捨五入するともっともらしいインデックスがわかる
-					const int neibourRawIndex = (regRayDirLati - (ureal)centerRawIndex) > 0. ? centerRawIndex + 1 : centerRawIndex - 1;//隣り合う行のもっともらしいインデックスもわかる
-					//printf("row index %d,%d\n", centerRawIndex, neibourRawIndex);
-
-					//ではここから行中の当たり判定を始める
-					optional<std::pair<uvec2, uvec2>> hitLensCenterAndHitDistInMapDesigned;//対象のレンズの中心位置
-					for (const auto& rid : { centerRawIndex,neibourRawIndex }) {
-
-						//つぎにphiから何番目のレンズかを考える
-						const ureal regRayDirLonn = [&] {
-							//const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
-
-							const ureal zerothlenslonn = -rowLength / 2.;//-rowLength/2.が最初のレンズの位置　場合によって前後するけどね
-							const ureal zeroSetRayDir = rayDirInMapDesigned.x() - zerothlenslonn;//zero番目のレンズの場所をzeroに
-							const ureal finlenslonn = uleap(PairMinusPlus(rowLength / 2.), (lensNumInARow - 1) / (ureal)lensNumInARow);//最後のレンズの場所
-							//スケーリング　fin~0までのスケールがlensNumInCollum-1~0までのスケールになって欲しい
-							const ureal thisscale = (ureal)(lensNumInARow - 1 - 0) / (finlenslonn - zerothlenslonn);
+						//py::sf("plt.scatter(%f,%f,color=(0,0,0))", rayDirInBallLocalMapDesigned.x(), rayDirInBallLocalMapDesigned.y());
+						//デザインマップのシータからrowがわかる
+						//const ureal tlati = eachRowsDistance * rd-(eachRowsDistance*(ureal)(rowNum-1)/2.);//lati方向の現在位置
+						//シータは-eachRowsDistance*(ureal)(rowNum-1)/2~eachRowDistance*(rownum-1)/2まで
+						//まずrayDirInMapDのlatitudeを正規化する 一番下のrowの高さちょうどのとき 0　一番上のrowの高さちょうどのときrowNum-1になるようにする
+						const ureal regRayDirLati = [&] {
+							const ureal zerothRowlati = -(eachRowsDistance * (ureal)(rowNum - 1) / 2.);//zero番目の行の高さ
+							const ureal zeroSetRayDir = rayDirInMapDesigned.y() - zerothRowlati;//0番目の行の高さに始点を合わせたレイの高さ
+							const ureal finalRowlati = (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//rowNum-1番目の行の高さ
+							//スケーリング　fin~0までのスケールがrowNum-1~0までのスケールになって欲しい
+							const ureal thisscale = (ureal)(rowNum - 1 - 0) / (finalRowlati - zerothRowlati);
 
 							return thisscale * zeroSetRayDir;
 						}();
-						const bool eachFlag = rid % 2;//交互に切り替わるフラグ 立っているときは行が半周進んでる
 
-						const int centerLensIndex = round(regRayDirLonn - (eachFlag ? 0.5 : 0.));//これはオフセットがない　つまりよりマイナス側から始まっている行にいる場合のインデックス そうでなければ-0.5してから丸める←やりました
-						const int neibourLensIndex = (regRayDirLonn - (ureal)centerLensIndex) > 0. ? centerLensIndex + 1 : centerLensIndex - 1;//隣り合うレンズのもっともらしいインデックスもわかる
-						//printf("lens index %d,%d\n", centerLensIndex, neibourLensIndex);
 
-						//ではレンズの当たり判定を始める
-						for (const auto& lid : { centerLensIndex,neibourLensIndex }) {
-							//これでレンズの場所が確定するはず
-							const auto hitlensCenterInMapDesigned = uvec2(uleap(PairMinusPlus(rowLength / 2.), lid / (ureal)lensNumInARow) + (eachFlag ? ((rowLength) / (ureal)lensNumInARow / 2.) : 0.), eachRowsDistance * rid - (eachRowsDistance * (ureal)(rowNum - 1) / 2.));
-							const uvec2 hitDistInMapDesigned = rayDirInMapDesigned - hitlensCenterInMapDesigned;//相対ヒット位置 もちろんマップD上
-							//本当かしら とりあえず概形の中に入っているかどうかを判定
-							if (NaihouHantei(hitDistInMapDesigned, hexverticesNodelensOuter)) {
-								if (hitDistInMapDesigned.norm() >= nodeLensRadius)throw logic_error("判定がだめ");
-								//printf("ok r=%d l=%d\n", rid, lid);
+						const int centerRawIndex = round(regRayDirLati);//四捨五入するともっともらしいインデックスがわかる
+						const int neibourRawIndex = (regRayDirLati - (ureal)centerRawIndex) > 0. ? centerRawIndex + 1 : centerRawIndex - 1;//隣り合う行のもっともらしいインデックスもわかる
+						//printf("row index %d,%d\n", centerRawIndex, neibourRawIndex);
 
-								//とりあえずテスト　これがcenterでない可能性はあるの?
-								if (rid != centerRawIndex || lid != centerLensIndex)
-									if (logWarningInScan)cout << "別にエラーではないけど想像したのと違う!" << endl;
+						//ではここから行中の当たり判定を始める
+						optional<std::pair<uvec2, uvec2>> hitLensCenterAndHitDistInMapDesigned;//対象のレンズの中心位置
+						for (const auto& rid : { centerRawIndex,neibourRawIndex }) {
 
-								hitLensCenterAndHitDistInMapDesigned = make_pair(hitlensCenterInMapDesigned, hitDistInMapDesigned);
-								break;
+							//つぎにphiから何番目のレンズかを考える
+							const ureal regRayDirLonn = [&] {
+								//const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
+
+								const ureal zerothlenslonn = -rowLength / 2.;//-rowLength/2.が最初のレンズの位置　場合によって前後するけどね
+								const ureal zeroSetRayDir = rayDirInMapDesigned.x() - zerothlenslonn;//zero番目のレンズの場所をzeroに
+								const ureal finlenslonn = uleap(PairMinusPlus(rowLength / 2.), (lensNumInARow - 1) / (ureal)lensNumInARow);//最後のレンズの場所
+								//スケーリング　fin~0までのスケールがlensNumInCollum-1~0までのスケールになって欲しい
+								const ureal thisscale = (ureal)(lensNumInARow - 1 - 0) / (finlenslonn - zerothlenslonn);
+
+								return thisscale * zeroSetRayDir;
+							}();
+							const bool eachFlag = rid % 2;//交互に切り替わるフラグ 立っているときは行が半周進んでる
+
+							const int centerLensIndex = round(regRayDirLonn - (eachFlag ? 0.5 : 0.));//これはオフセットがない　つまりよりマイナス側から始まっている行にいる場合のインデックス そうでなければ-0.5してから丸める←やりました
+							const int neibourLensIndex = (regRayDirLonn - (ureal)centerLensIndex) > 0. ? centerLensIndex + 1 : centerLensIndex - 1;//隣り合うレンズのもっともらしいインデックスもわかる
+							//printf("lens index %d,%d\n", centerLensIndex, neibourLensIndex);
+
+							//ではレンズの当たり判定を始める
+							for (const auto& lid : { centerLensIndex,neibourLensIndex }) {
+								//これでレンズの場所が確定するはず
+								const auto hitlensCenterInMapDesigned = uvec2(uleap(PairMinusPlus(rowLength / 2.), lid / (ureal)lensNumInARow) + (eachFlag ? ((rowLength) / (ureal)lensNumInARow / 2.) : 0.), eachRowsDistance * rid - (eachRowsDistance * (ureal)(rowNum - 1) / 2.));
+								const uvec2 hitDistInMapDesigned = rayDirInMapDesigned - hitlensCenterInMapDesigned;//相対ヒット位置 もちろんマップD上
+								//本当かしら とりあえず概形の中に入っているかどうかを判定
+								if (NaihouHantei(hitDistInMapDesigned, hexverticesNodelensOuter)) {
+									if (hitDistInMapDesigned.norm() >= nodeLensRadius)throw logic_error("判定がだめ");
+									//printf("ok r=%d l=%d\n", rid, lid);
+
+									//とりあえずテスト　これがcenterでない可能性はあるの?
+									if (rid != centerRawIndex || lid != centerLensIndex)
+										if (logWarningInScan)cout << "別にエラーではないけど想像したのと違う!" << endl;
+
+									hitLensCenterAndHitDistInMapDesigned = make_pair(hitlensCenterInMapDesigned, hitDistInMapDesigned);
+									break;
+								}
 							}
+
+							if (hitLensCenterAndHitDistInMapDesigned)break;
 						}
 
-						if (hitLensCenterAndHitDistInMapDesigned)break;
-					}
+						//ここまでで結果が出ないとやばい
+						if (!hitLensCenterAndHitDistInMapDesigned)throw std::runtime_error("要素レンズの検索に失敗");
 
-					//ここまでで結果が出ないとやばい
-					if (!hitLensCenterAndHitDistInMapDesigned)throw std::runtime_error("要素レンズの検索に失敗");
+						//焦点の場所は要素レンズが確定すれば計算できる
+						const auto focalposInBalllocalXYZ = Polar3DToXyz(ExtendUvec2(MapToLocalPolar(DesignedMapToMap.prograte() * hitLensCenterAndHitDistInMapDesigned.value().first), sphereRadius + nodeLensFocalLength));
 
-					//焦点の場所は要素レンズが確定すれば計算できる
-					const auto focalposInBalllocalXYZ = Polar3DToXyz(ExtendUvec2(MapToLocalPolar(DesignedMapToMap.prograte() * hitLensCenterAndHitDistInMapDesigned.value().first), sphereRadius + nodeLensFocalLength));
+						const auto hitPosInBalllocalXYZ = PolarToXyz(rayDirInBallInBalllocalPolar);//ここがボールローカルでのヒット点
+						const auto refractRayDirInBalllocalXYZ = (focalposInBalllocalXYZ - hitPosInBalllocalXYZ);//衝突点と焦点の位置が分かれば光の方向がわかるね　暫定的に
+						//これをグローバルに戻す
+						const uvec3 refractRayDirInGlobal = GlobalToBallLocal.untiprograte() * refractRayDirInBalllocalXYZ;
 
-					const auto hitPosInBalllocalXYZ = PolarToXyz(rayDirInBallInBalllocalPolar);//ここがボールローカルでのヒット点
-					const auto refractRayDirInBalllocalXYZ = (focalposInBalllocalXYZ - hitPosInBalllocalXYZ);//衝突点と焦点の位置が分かれば光の方向がわかるね　暫定的に
-					//これをグローバルに戻す
-					const uvec3 refractRayDirInGlobal = GlobalToBallLocal.untiprograte() * refractRayDirInBalllocalXYZ;
-
-					//プロットします　ヒットポイントに
-					if (pd == 0 && drawRefractionDirectionOfARay) {
-						const auto color = HsvToRgb({ rd / (ureal)(numOfProjectionPerACycle - 1),1.,1. });
-						py::sf("mlab.quiver3d(0,0,0,%f,%f,%f,mode=\"arrow\",color=(%f,%f,%f))", refractRayDirInGlobal.x(), refractRayDirInGlobal.y(), refractRayDirInGlobal.z(), color[0], color[1], color[2]);
-						py::sf("plt.scatter(%f,%f,color=(%f,%f,%f))", hitLensCenterAndHitDistInMapDesigned.value().second.x(), hitLensCenterAndHitDistInMapDesigned.value().second.y(), color[0], color[1], color[2]);
+						//プロットします　ヒットポイントに
+						if (vpd == 0 && drawRefractionDirectionOfARay) {
+							const auto color = HsvToRgb({ rd / (ureal)(numOfProjectionPerACycle - 1),1.,1. });
+							py::sf("mlab.quiver3d(0,0,0,%f,%f,%f,mode=\"arrow\",color=(%f,%f,%f))", refractRayDirInGlobal.x(), refractRayDirInGlobal.y(), refractRayDirInGlobal.z(), color[0], color[1], color[2]);
+							py::sf("plt.scatter(%f,%f,color=(%f,%f,%f))", hitLensCenterAndHitDistInMapDesigned.value().second.x(), hitLensCenterAndHitDistInMapDesigned.value().second.y(), color[0], color[1], color[2]);
+						}
 					}
 				}
-
 				*finflag = true;
 			};
 
@@ -330,9 +341,18 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		//表示する 3d 2dの順
 		py::s("mlab.show()");
 		py::s("plt.show()");
+
+
+		const auto endTimePoint = std::chrono::system_clock::now();
+		cout << "Finish: " << endTimePoint << endl;
+		cout << "Process time: " << std::chrono::duration_cast<std::chrono::milliseconds>(endTimePoint - startTimePoint).count() / 1000. << " [s]" << endl;
+		cout << "The work is complete...Wait rendering by Python" << endl;
+		py::Terminate();
 	}
 	catch (std::exception& ex) {
 		cout << ex.what() << endl;
+		cout << "ERROR: " << std::chrono::system_clock::now() << endl;
+
 		system("pause");//なんか入れたら終わり
 
 		py::Terminate();
@@ -340,13 +360,13 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 	}
 	catch (...) {
 		cout << "unknown err" << endl;
+		cout << "ERROR: " << std::chrono::system_clock::now() << endl;
+
 		system("pause");//なんか入れたら終わり
 
 		py::Terminate();
 		return -2;
 	}
 
-	cout << "The work is complete...Wait rendering by Python" << endl;
-	py::Terminate();
 	return 0;
 }
