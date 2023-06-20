@@ -6,7 +6,7 @@
 using namespace std;
 
 const std::string rezpath = "C:/local/user/lensball/lensball/resultsX/";//結果を格納するフォルダ
-const std::string branchpath = "SphereCoord/";//このbranchの結果を格納するフォルダ
+const std::string branchpath = "HexBall/";//このbranchの結果を格納するフォルダ
 
 using py = pythonRuntime;
 
@@ -106,7 +106,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			return hexvjunk;
 		}();
 
-		constexpr bool calcNodelenses = true;//ノードレンズの位置を計算してレンズボールを形成する
+		constexpr bool calcNodelenses = false;//ノードレンズの位置を計算してレンズボールを形成する
 		constexpr bool drawNodelenses = calcNodelenses & true;//要素レンズを描画する
 		constexpr bool drawNodelensEdges = calcNodelenses & true;//ノードレンズの枠線を描画する
 		if(calcNodelenses){
@@ -168,13 +168,19 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		constexpr size_t numOfProjectionPerACycle = 720;//一回転での投影数
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 
+		constexpr size_t scanThreadNum = 11;//スキャンに使うスレッド数
+		std::array<uptr<std::thread>, scanThreadNum> scanThreads;//実行スレッド
+		std::array<std::atomic_bool, scanThreadNum> scanThreadIsFin;//すきゃんがおわったことを報告
+
 		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		if(scanLenses){
 			ResetPyVecSeries<6>(quiverSeries,quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
 
-			for (std::decay<decltype(numOfProjectionPerACycle)>::type rd = 0; rd < numOfProjectionPerACycle; rd++) {
+			//回転角度ごとにスレッドを割り付ける
+			const auto scanAScene = [&](const std::decay<decltype(numOfProjectionPerACycle)>::type rd, decltype(scanThreadIsFin)::iterator finflag) {
+
 				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
 				const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
 
@@ -267,7 +273,37 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						py::sf("plt.scatter(%f,%f,color=(%f,%f,%f))", hitLensCenterAndHitDistInMapDesigned.value().second.x(), hitLensCenterAndHitDistInMapDesigned.value().second.y(), color[0], color[1], color[2]);
 					}
 				}
+
+				*finflag = true;
+			};
+
+			for (std::decay<decltype(numOfProjectionPerACycle)>::type rdgen = 0; rdgen < numOfProjectionPerACycle; rdgen++) {
+
+				//このrdgenでの処理を開いているスレッドに割り付けたい
+				bool isfound = false;
+				while (!isfound) {//割り付けられなければ繰り返す
+					for (size_t t=0;t<scanThreadNum;t++)
+						if (!scanThreads.at(t)) {//空きなら割付
+							if (!isfound) {//一つのインデックスには一回だけ割り付ける
+								isfound = true;
+								scanThreadIsFin.at(t) = false;//フラグをセット
+
+								scanThreads.at(t).reset(new std::thread(scanAScene, rdgen, scanThreadIsFin.begin() + t));//スレッド実行開始
+							}
+						}
+						else if (scanThreadIsFin.at(t)) {//空いてなくて終わってるなら
+							scanThreads.at(t).get()->join();
+							scanThreads.at(t).release();//リソースを開放
+						}
+				}
 			}
+
+			//全部のスレッドが終わっていることを確認
+			for (auto& t : scanThreads)
+				if (t) {
+					t.get()->join();
+					t.release();
+				}
 		};
 		
 
