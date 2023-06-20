@@ -163,12 +163,12 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 		//スキャンをする
-		constexpr size_t projectorResInTheta = 2;//プロジェクタの縦がわ解像度
+		constexpr size_t projectorResInTheta = 720;//プロジェクタの縦がわ解像度
 		constexpr ureal projectorHalfAngle = 60. / 180. * pi;//プロジェクトの投映角
 		constexpr size_t numOfProjectionPerACycle = 720;//一回転での投影数
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 
-		constexpr size_t scanThreadNum = 11;//スキャンに使うスレッド数
+		constexpr size_t scanThreadNum = 19;//スキャンに使うスレッド数
 		std::array<uptr<std::thread>, scanThreadNum> scanThreads;//実行スレッド
 		std::array<std::atomic_bool, scanThreadNum> scanThreadIsFin;//すきゃんがおわったことを報告
 
@@ -326,6 +326,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		return -2;
 	}
 
+	cout << "The work is complete...Wait rendering by Python" << endl;
 	py::Terminate();
 	return 0;
 }
