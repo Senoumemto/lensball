@@ -43,6 +43,18 @@ uvec6 ArrowToUVec6(const arrow<3>& v) {
 	return uvec6(v.org().x(), v.org().y(), v.org().z(), v.dir().x(), v.dir().y(), v.dir().z());
 }
 
+template < typename T > constexpr T sqrt_constexpr(T s){
+	T x = s / 2.0;
+	T prev = 0.0;
+
+	while (x != prev)
+	{
+		prev = x;
+		x = (x + s / x) / 2.0;
+	}
+	return x;
+}
+
 int main() {
 
 	try {
@@ -81,16 +93,23 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 )", sphereResolution, sphereResolution, sphereRadius, sphereRadius, sphereRadius);
 		};
 
+		//ハードウェアスペック
+		constexpr size_t projectorFps = 22727;//フレームレート
+		constexpr size_t numOfProjectionPerACycle = 1024;//一周ごとの投映数
+		constexpr ureal rotationSpeed = projectorFps / (ureal)numOfProjectionPerACycle;//回転速度
+		//解像度
+		constexpr size_t verticalDirectionResolution = sqrt_constexpr(numOfProjectionPerACycle);//垂直解像度(一周に並んでいるレンズの数)
+		constexpr size_t horizontalDirectionResolution = numOfProjectionPerACycle / verticalDirectionResolution;//水平解像度　位置レンズあたりの投映数
 
 
 		//レンズアレイを作成、描画する
 		//六角形でタイリングする　偶数行を書いてから奇数行を書くって感じ
-		constexpr size_t lensNumInCollum = 20;
+		constexpr size_t lensNumInARow = verticalDirectionResolution;
 
-		constexpr ureal rowAngle = 0.04331481 * 2.;//行の角度
+		constexpr ureal rowAngle = 0.02706659 * 2.;//行の角度 theta=atan(-1.5*1/(cos(theta)*sqrt(3))*1/lensnum)
 		const ureal rowLength = 2. * pi * cos(rowAngle);//行の長さ
-		const ureal lensEdgeWidth = rowLength / (ureal)lensNumInCollum / 2.;
-		const ureal eachRowsDistance = 1.5 * rowLength / sqrt(3.) / (ureal)lensNumInCollum;//六角形の一変だけシフトする
+		const ureal lensEdgeWidth = rowLength / (ureal)lensNumInARow / 2.;
+		const ureal eachRowsDistance = 1.5 * rowLength / sqrt(3.) / (ureal)lensNumInARow;//六角形の一変だけシフトする
 		const auto DesignedMapToMap = bitrans<Eigen::Rotation2D<ureal>>(Eigen::Rotation2D<ureal>(rowAngle));//レンズアレイを傾斜させる前から傾斜させたあとにする
 
 		const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の半径
@@ -107,21 +126,21 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		}();
 
 		constexpr bool calcNodelenses = false;//ノードレンズの位置を計算してレンズボールを形成する
-		constexpr bool drawNodelenses = calcNodelenses & true;//要素レンズを描画する
+		constexpr bool drawNodelenses = calcNodelenses & false;//要素レンズを描画する
 		constexpr bool drawNodelensEdges = calcNodelenses & true;//ノードレンズの枠線を描画する
 		if(calcNodelenses){
 			//std::list<uleap>//マップ座標でのレンズ中心
 			for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 				const ureal tlati = eachRowsDistance * rd - (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//lati方向の現在位置
 				const bool eachFlag = rd % 2;//交互に切り替わるフラグ
-				for (std::decay<decltype(lensNumInCollum)>::type ld = 0; ld < lensNumInCollum; ld++) {
+				for (std::decay<decltype(lensNumInARow)>::type ld = 0; ld < lensNumInARow; ld++) {
 
-					auto color = HsvToRgb({ uleap({0.,1.},ld / (ureal)lensNumInCollum),1.,1. });//色を行方向に変える
+					auto color = HsvToRgb({ uleap({0.,1.},ld / (ureal)lensNumInARow),1.,1. });//色を行方向に変える
 					//六角形を収めるバッファをクリア
 					ResetPyVecSeries(pypltSeries);
 
 					//lonn方向の現在位置
-					const ureal tlonn = uleap(PairMinusPlus(rowLength / 2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
+					const ureal tlonn = uleap(PairMinusPlus(rowLength / 2.), ld / (ureal)lensNumInARow) + (eachFlag ? ((rowLength) / (ureal)lensNumInARow / 2.) : 0.);
 					const auto localcenterInMapDesigned = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
 					const auto localcenterInMap = DesignedMapToMap.prograte() * localcenterInMapDesigned;
 					const auto localcenterInBalllocalPolar = MapToLocalPolar(localcenterInMap);
@@ -165,7 +184,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		//スキャンをする
 		constexpr size_t projectorResInTheta = 720;//プロジェクタの縦がわ解像度
 		constexpr ureal projectorHalfAngle = 60. / 180. * pi;//プロジェクトの投映角
-		constexpr size_t numOfProjectionPerACycle = 720;//一回転での投影数
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 
 		constexpr size_t scanThreadNum = 19;//スキャンに使うスレッド数
@@ -173,7 +191,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		std::array<std::atomic_bool, scanThreadNum> scanThreadIsFin;//すきゃんがおわったことを報告
 
 		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
-		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
+		constexpr bool drawRefractionDirectionOfARay = true;//あるレイの屈折方向を描画する
+		constexpr bool logWarningInScan = false;//scan中の警告を表示する
 		if(scanLenses){
 			ResetPyVecSeries<6>(quiverSeries,quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
@@ -222,9 +241,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 							const ureal zerothlenslonn = -rowLength / 2.;//-rowLength/2.が最初のレンズの位置　場合によって前後するけどね
 							const ureal zeroSetRayDir = rayDirInMapDesigned.x() - zerothlenslonn;//zero番目のレンズの場所をzeroに
-							const ureal finlenslonn = uleap(PairMinusPlus(rowLength / 2.), (lensNumInCollum - 1) / (ureal)lensNumInCollum);//最後のレンズの場所
+							const ureal finlenslonn = uleap(PairMinusPlus(rowLength / 2.), (lensNumInARow - 1) / (ureal)lensNumInARow);//最後のレンズの場所
 							//スケーリング　fin~0までのスケールがlensNumInCollum-1~0までのスケールになって欲しい
-							const ureal thisscale = (ureal)(lensNumInCollum - 1 - 0) / (finlenslonn - zerothlenslonn);
+							const ureal thisscale = (ureal)(lensNumInARow - 1 - 0) / (finlenslonn - zerothlenslonn);
 
 							return thisscale * zeroSetRayDir;
 						}();
@@ -237,7 +256,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						//ではレンズの当たり判定を始める
 						for (const auto& lid : { centerLensIndex,neibourLensIndex }) {
 							//これでレンズの場所が確定するはず
-							const auto hitlensCenterInMapDesigned = uvec2(uleap(PairMinusPlus(rowLength / 2.), lid / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.), eachRowsDistance * rid - (eachRowsDistance * (ureal)(rowNum - 1) / 2.));
+							const auto hitlensCenterInMapDesigned = uvec2(uleap(PairMinusPlus(rowLength / 2.), lid / (ureal)lensNumInARow) + (eachFlag ? ((rowLength) / (ureal)lensNumInARow / 2.) : 0.), eachRowsDistance * rid - (eachRowsDistance * (ureal)(rowNum - 1) / 2.));
 							const uvec2 hitDistInMapDesigned = rayDirInMapDesigned - hitlensCenterInMapDesigned;//相対ヒット位置 もちろんマップD上
 							//本当かしら とりあえず概形の中に入っているかどうかを判定
 							if (NaihouHantei(hitDistInMapDesigned, hexverticesNodelensOuter)) {
@@ -245,7 +264,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 								//printf("ok r=%d l=%d\n", rid, lid);
 
 								//とりあえずテスト　これがcenterでない可能性はあるの?
-								if (rid != centerRawIndex || lid != centerLensIndex)std::runtime_error("別にエラーではないけど想像したのと違う!");
+								if (rid != centerRawIndex || lid != centerLensIndex)
+									if (logWarningInScan)cout << "別にエラーではないけど想像したのと違う!" << endl;
 
 								hitLensCenterAndHitDistInMapDesigned = make_pair(hitlensCenterInMapDesigned, hitDistInMapDesigned);
 								break;
@@ -256,7 +276,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					}
 
 					//ここまでで結果が出ないとやばい
-					if (!hitLensCenterAndHitDistInMapDesigned)std::runtime_error("要素レンズの検索に失敗");
+					if (!hitLensCenterAndHitDistInMapDesigned)throw std::runtime_error("要素レンズの検索に失敗");
 
 					//焦点の場所は要素レンズが確定すれば計算できる
 					const auto focalposInBalllocalXYZ = Polar3DToXyz(ExtendUvec2(MapToLocalPolar(DesignedMapToMap.prograte() * hitLensCenterAndHitDistInMapDesigned.value().first), sphereRadius + nodeLensFocalLength));
