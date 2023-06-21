@@ -7,6 +7,7 @@
 
 #include <fstream>
 
+#define CEREAL_THREAD_SAFE 1
 #include <cereal/cereal.hpp>
 #include <cereal/archives/json.hpp>
 #include <cereal/archives/binary.hpp>
@@ -79,8 +80,20 @@ public:
 		for (size_t d = 0; d < SIZ; d++) {
 			archive(this->dir()[d]);
 		}
-			//archive(this->org().x(), this->org().y(), this->org().z(),
-			//this->dir().x(), this->dir().y(), this->dir().z());
+
+		//archive(this->org().x(), this->org().y(), this->org().z(),
+		//this->dir().x(), this->dir().y(), this->dir().z());
+	}
+	//シリアライズできるように
+	template<class Archive> void serialize(Archive& archive) {
+		for (size_t d = 0; d < SIZ; d++) {
+			archive(this->org()[d]);
+		}
+		for (size_t d = 0; d < SIZ; d++) {
+			archive(this->dir()[d]);
+		}
+		//archive(this->org().x(), this->org().y(), this->org().z(),
+		//this->dir().x(), this->dir().y(), this->dir().z());
 	}
 };
 using arrow2 = arrow<2>;
@@ -219,9 +232,13 @@ public:
 
 	projRefraDicHeader(const size_t& hRes, const size_t& vRes, const size_t& rotRes) :
 		rotationRes(rotRes),verticalRes(vRes),horizontalRes(hRes){}
+	projRefraDicHeader() {}
 
 	//シリアライズできるように
 	template<class Archive> void serialize(Archive& archive) const{
+		archive(this->horizontalRes, this->verticalRes, this->rotationRes);
+	}
+	template<class Archive> void serialize(Archive& archive) {
 		archive(this->horizontalRes, this->verticalRes, this->rotationRes);
 	}
 

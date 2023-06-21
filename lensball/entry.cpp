@@ -55,6 +55,44 @@ template < typename T > constexpr T sqrt_constexpr(T s){
 	return x;
 }
 
+//プロジェクター辞書をデコードする
+void DeserializeProjRefraDic(const std::string& path) {
+	//ヘッダをロードする
+	projRefraDicHeader header;
+	{
+		ifstream ifs(path + ".head", std::ios::binary);
+		cereal::BinaryInputArchive iarch(ifs);
+
+		iarch(header);
+
+		cout << "Loaded header\nh: " << header.horizontalRes << "\nv: " << header.verticalRes << "\nt: " << header.rotationRes << endl;
+	}
+
+
+	//プロジェクターの色を計算することができるよ　各フレームごとに
+	for (size_t sd = 0; sd < header.rotationRes; sd++) {
+		//シーンのレイリストを計算する
+		std::list<arrow3> raylist;
+		{
+			ifstream ifs(path + ".part" + to_string(sd), std::ios::binary);
+			if (!ifs)throw std::runtime_error("ファイルを読めない");
+
+			cereal::BinaryInputArchive iarch(ifs);
+			iarch(raylist);
+		}
+
+		//これをたどればOK
+		auto listite = raylist.cbegin();
+		for(size_t hd=0;hd<header.horizontalRes;hd++,listite++)
+			for (size_t vd = 0; vd < header.verticalRes; vd++) {
+				const arrow3 refraction = (*listite);//このピクセルに対応するレイ
+
+
+
+			}
+
+	}
+}
 
 int main() {
 
@@ -188,9 +226,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 		//スキャンをする
-		constexpr size_t projectorResInTheta = 768;//プロジェクタの縦がわ解像度
+		constexpr size_t projectorResInTheta = 768;//プロジェクタの縦側解像度 ホントはXGA
 		constexpr ureal projectorHalfAngleTheta = 60. / 180. * pi;//プロジェクトの投映角
-		constexpr size_t projectorResInPhi = 1024;
+		constexpr size_t projectorResInPhi = 2; // プロジェクタの横側解像度 ホントはXGA
 		constexpr ureal projectorHalfAnglePhi = projectorHalfAngleTheta * (projectorResInPhi / (ureal)projectorResInTheta);//プロジェクトの投映角
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 
@@ -234,7 +272,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 				//結果格納メモリとストレージを用意する
 				std::list<arrow3> rezMem;
-				std::ofstream storageStream(rezpath + branchpath + resultDicPrefix + ".part" + to_string(rd));
+				std::ofstream storageStream(rezpath + branchpath + resultDicPrefix + ".part" + to_string(rd), std::ios::binary);
 
 				//各ピクセルから飛び出るレイと回転角度rdの球との当たり判定を行う
 				for (std::decay<decltype(projectorResInPhi)>::type hpd = 0; hpd < projectorResInPhi; hpd++) {
@@ -342,7 +380,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 				*finflagOfStIte = true;
 			};
 
-			//回転角度を変えながらスキャンする
+			//複数スレッドに回転角度を変えながら割り当てる
 			for (std::decay<decltype(numOfProjectionPerACycle)>::type rdgen = 0; rdgen < numOfProjectionPerACycle; rdgen++) {
 				cout << "count: " << rdgen << endl;
 				//このrdgenでの処理を開いているスレッドに割り付けたい
@@ -375,10 +413,12 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			}
 		};
 		
+		//デコードする
+		DeserializeProjRefraDic(rezpath + branchpath + resultDicPrefix);
 
 		//表示する 3d 2dの順
-		py::s("mlab.show()");
-		py::s("plt.show()");
+		//py::s("mlab.show()");
+		//py::s("plt.show()");
 
 
 		const auto endTimePoint = std::chrono::system_clock::now();
