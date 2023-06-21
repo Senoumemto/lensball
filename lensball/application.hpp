@@ -4,6 +4,15 @@
 #include "matplotwrapper.hpp"
 #include "general.hpp"
 
+
+#include <fstream>
+
+#include <cereal/cereal.hpp>
+#include <cereal/archives/json.hpp>
+#include <cereal/archives/binary.hpp>
+#include <cereal/types/string.hpp>
+#include <cereal/types/list.hpp>
+
 //plotterの準備関数
 uptr<matplotlib> SetupPythonRuntime();
 void DefinePythonFunctions(uptr<matplotlib>& plt);
@@ -60,6 +69,18 @@ public:
 		}
 
 		return ret;
+	}
+
+	//シリアライズできるように
+	template<class Archive> void serialize(Archive& archive) const{
+		for (size_t d = 0; d < SIZ; d++) {
+			archive(this->org()[d]);
+		}
+		for (size_t d = 0; d < SIZ; d++) {
+			archive(this->dir()[d]);
+		}
+			//archive(this->org().x(), this->org().y(), this->org().z(),
+			//this->dir().x(), this->dir().y(), this->dir().z());
 	}
 };
 using arrow2 = arrow<2>;
@@ -188,6 +209,32 @@ template<size_t D>std::string GetPySeriesForPlot(const pyVecSeries<D>& vecname, 
 std::list<uvec2> MakeHexagon(const ureal& edgeWidth);
 
 
+//projectorRefractionDicのヘッダ構造
+class projRefraDicHeader {
+public:
+	size_t horizontalRes;//水平分解能　ピクセル数
+	size_t verticalRes;//垂直分解能　ピクセル数
+	size_t rotationRes;//回転分解能t つまり一周に何回投影するか　つまり分散数
+	
+
+	projRefraDicHeader(const size_t& hRes, const size_t& vRes, const size_t& rotRes) :
+		rotationRes(rotRes),verticalRes(vRes),horizontalRes(hRes){}
+
+	//シリアライズできるように
+	template<class Archive> void serialize(Archive& archive) const{
+		archive(this->horizontalRes, this->verticalRes, this->rotationRes);
+	}
+
+	//ヘッダファイルを保存
+	void SaveHeader(const std::string& path) const{
+		std::ofstream ofs(path + ".head");
+		cereal::BinaryOutputArchive o_archive(ofs);
+
+		o_archive((projRefraDicHeader&)(*this));
+
+		return;
+	}
+};
 
 
 

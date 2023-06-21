@@ -2,11 +2,6 @@
 #include "application.hpp"
 #include "matplotwrapper.hpp"
 #include "general.hpp"
-#include <fstream>
-
-#include <cereal/cereal.hpp>
-#include <cereal/archives/json.hpp>
-#include <cereal/archives/binary.hpp>
 
 using namespace std;
 
@@ -60,13 +55,6 @@ template < typename T > constexpr T sqrt_constexpr(T s){
 	return x;
 }
 
-template<class Archive>
-void serialize(Archive& archive, std::pair<Eigen::Vector3i, arrow3>& dic)
-{
-	archive(dic.first.x(), dic.first.y(), dic.first.z(),
-		dic.second.org().x(), dic.second.org().y(), dic.second.org().z(),
-		dic.second.dir().x(), dic.second.dir().y(), dic.second.dir().z());
-}
 
 int main() {
 
@@ -209,7 +197,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		//std::unordered_map<Eigen::Vector3i, arrow3> projectorRefractRayMap;
 
 		constexpr size_t scanThreadNum = 16;//スキャンに使うスレッド数
-		constexpr size_t sendStorageThreshold = 0;//各スレッドごとにこれを超えるとストレージに保存を行う
+		const std::string resultDicPrefix = "projRefRayMap";
 
 		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
@@ -221,32 +209,32 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			//並列処理用のいろいろ
 			std::array<uptr<std::thread>, scanThreadNum> scanThreads;//実行スレッド
-			std::array<std::unordered_map<Eigen::Vector3i, arrow3>, scanThreadNum> scanResultOfEachScanThread;//各スレッドごとに結果をためていく//レンズボールからどのようなレイが出るのか　そのレイはプロジェクタのどこと(h,v,t)対応づくのか
 			std::array<bool, scanThreadNum> finFlagOfEachScanThread;//スキャンがおわったことを報告
-			//結果格納ストリームを用意する
-			std::array<uptr<std::ofstream>, scanThreadNum> storageOfEachScanThread;
-			for (size_t sd = 0; sd < scanThreadNum; sd++) {
-				storageOfEachScanThread.at(sd).reset(new std::ofstream(rezpath + branchpath + "projRefRayMapPart" + to_string(sd) + ".bin"));
-			}
+
+			//格納結果の形式を示すヘッダを作って保存する
+			const projRefraDicHeader storageheader(projectorResInPhi, projectorResInTheta, numOfProjectionPerACycle);
+			storageheader.SaveHeader(rezpath + branchpath + resultDicPrefix);
 
 			ResetPyVecSeries<6>(quiverSeries,quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
 
 
 			//指定された結果を指定されたストレージへ送信する 転送したあとはRezはクリアされます
-			const std::function<void(std::unordered_map<Eigen::Vector3i,arrow3>&,ofstream*)> TransRezToStorage = [&](decltype(scanResultOfEachScanThread)::value_type& rezOfSt, ofstream* storageofStPtr) {
-				cereal::BinaryOutputArchive o_archive(*storageofStPtr);
-
-				for (std::pair<Eigen::Vector3i, arrow3> dicp : rezOfSt)
-					o_archive(dicp);
+			const auto TransRezToStorage = [&](std::list<arrow3>& rezOfSt, ofstream& storageofStPtr) {
+				cereal::BinaryOutputArchive o_archive(storageofStPtr);
+				o_archive(rezOfSt);
 
 				rezOfSt.clear();
 			};
 			//回転角度ごとにスキャンを行う
-			const auto ScanAScene = [&](const std::decay<decltype(numOfProjectionPerACycle)>::type rd, decltype(scanResultOfEachScanThread)::iterator rezOfStIte, decltype(finFlagOfEachScanThread)::iterator finflagOfStIte, decltype(storageOfEachScanThread)::iterator storageOfStIte) {
+			const auto ScanAScene = [&](const std::decay<decltype(numOfProjectionPerACycle)>::type rd, decltype(finFlagOfEachScanThread)::iterator finflagOfStIte) {
 
 				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
 				const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
+
+				//結果格納メモリとストレージを用意する
+				std::list<arrow3> rezMem;
+				std::ofstream storageStream(rezpath + branchpath + resultDicPrefix + ".part" + to_string(rd));
 
 				//各ピクセルから飛び出るレイと回転角度rdの球との当たり判定を行う
 				for (std::decay<decltype(projectorResInPhi)>::type hpd = 0; hpd < projectorResInPhi; hpd++) {
@@ -337,7 +325,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						const uvec3 refractRayDirInGlobal = GlobalToBallLocal.untiprograte() * refractRayDirInBalllocalXYZ;
 
 						//結果を追加
-						(*rezOfStIte)[Eigen::Vector3i(hpd, vpd, rd)] = arrow3(rayDirInGlobal, refractRayDirInGlobal);
+						rezMem.push_back(arrow3(rayDirInGlobal, refractRayDirInGlobal));
 
 						//プロットします　ヒットポイントに
 						if (vpd == 0 && drawRefractionDirectionOfARay) {
@@ -348,9 +336,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					}
 				}
 
-				//閾値を超えた場合はストレージに転送する
-				if ((*rezOfStIte).size() >= sendStorageThreshold)
-					TransRezToStorage(rezOfStIte.operator*(), storageOfStIte.operator*().get());
+				//スキャンが終わったらセーブ
+				TransRezToStorage(rezMem, storageStream);
+
 				*finflagOfStIte = true;
 			};
 
@@ -366,7 +354,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 								isfound = true;
 								finFlagOfEachScanThread.at(th) = false;//フラグをクリアして
 
-								scanThreads.at(th).reset(new std::thread(ScanAScene, rdgen, scanResultOfEachScanThread.begin() + th, finFlagOfEachScanThread.begin() + th, storageOfEachScanThread.begin() + th));//スレッド実行開始
+								scanThreads.at(th).reset(new std::thread(ScanAScene, rdgen,  finFlagOfEachScanThread.begin() + th));//スレッド実行開始
 							}
 						}
 						else if (finFlagOfEachScanThread.at(th)) {//空いてなくて終わってるなら
@@ -384,16 +372,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					scanThreads.at(th).get()->join();
 					scanThreads.at(th).release();
 				}
-
-				//残っている結果を転送する
-				scanThreads.at(th).reset(new std::thread(TransRezToStorage, std::ref(scanResultOfEachScanThread.at(th)), (ofstream*)(storageOfEachScanThread.at(th).get())));//スレッド実行開始
-
-			}
-
-			//スレッドを全部joinする
-			for (auto&t:scanThreads) {
-				t->join();
-				t.release();
 			}
 		};
 		
