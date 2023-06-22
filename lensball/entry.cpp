@@ -6,7 +6,7 @@
 using namespace std;
 
 const std::string rezpath = "C:/local/user/lensball/lensball/resultsX/";//結果を格納するフォルダ
-const std::string branchpath = "HexBall/";//このbranchの結果を格納するフォルダ
+const std::string branchpath = "SimVis/";//このbranchの結果を格納するフォルダ
 
 using py = pythonRuntime;
 
@@ -226,9 +226,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 		//スキャンをする
-		constexpr size_t projectorResInTheta = 768;//プロジェクタの縦側解像度 ホントはXGA
+		constexpr size_t projectorResInTheta = 256;//プロジェクタの縦側解像度 ホントはXGA
 		constexpr ureal projectorHalfAngleTheta = 60. / 180. * pi;//プロジェクトの投映角
-		constexpr size_t projectorResInPhi = 2; // プロジェクタの横側解像度 ホントはXGA
+		constexpr size_t projectorResInPhi = 256; // プロジェクタの横側解像度 ホントはXGA
 		constexpr ureal projectorHalfAnglePhi = projectorHalfAngleTheta * (projectorResInPhi / (ureal)projectorResInTheta);//プロジェクトの投映角
 		const ureal nodeLensFocalLength = nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
 
