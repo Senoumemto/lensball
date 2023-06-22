@@ -253,7 +253,24 @@ public:
 	}
 };
 
+//std::pair‚ğƒnƒbƒVƒ…‚·‚é
+struct HashPair {
 
+	static size_t m_hash_pair_random;
+
+	template<class T1, class T2>
+	size_t operator()(const std::pair<T1, T2>& p) const {
+
+		auto hash1 = std::hash<T1>{}(p.first);
+		auto hash2 = std::hash<T2>{}(p.second);
+
+		size_t seed = 0;
+		seed ^= hash1 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= hash2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
+};
 
 
 

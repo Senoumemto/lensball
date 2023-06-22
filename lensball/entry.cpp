@@ -146,38 +146,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		constexpr size_t verticalDirectionResolution = sqrt_constexpr(numOfProjectionPerACycle);//垂直解像度(一周に並んでいるレンズの数)
 		constexpr size_t horizontalDirectionResolution = numOfProjectionPerACycle / verticalDirectionResolution;//水平解像度　位置レンズあたりの投映数
 
-		//まずヘッダを読み出す
-		const std::string framePath = R"(C:\local\user\lensball\lensball\resultsX\projectorFrames\)";
-		const std::string dicHeaderPath =  R"(C:\local\user\lensball\lensball\resultsX\HexBall\projRefRayMap.head)";//辞書ヘッダが収まっている場所
-		projRefraDicHeader header;
-		{
-			ifstream ifs(dicHeaderPath, std::ios::binary);
-			cereal::BinaryInputArchive iarch(ifs);
-
-			iarch(header);
-
-			cout << "Loaded header\nh: " << header.horizontalRes << "\nv: " << header.verticalRes << "\nt: " << header.rotationRes << endl;
-		}
-
-		//解像度とかがわかる　シーンごとにループ
-		for (size_t rd = 0; rd < header.rotationRes; rd++) {
-			//まずはフレームを読み出す
-			const auto thisFrame = make_unique<bmpLib::img>();
-			bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
-
-
-		}
-
-
-
-
-
-
-
-
-
-
-
 
 		//レンズアレイを作成、描画する
 		//六角形でタイリングする　偶数行を書いてから奇数行を書くって感じ
@@ -202,10 +170,17 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			return hexvjunk;
 		}();
 
-		constexpr bool calcNodelenses = false;//ノードレンズの位置を計算してレンズボールを形成する
+		constexpr bool calcNodelenses = true;//ノードレンズの位置を計算してレンズボールを形成する
 		constexpr bool drawNodelenses = calcNodelenses & false;//要素レンズを描画する
 		constexpr bool drawNodelensEdges = calcNodelenses & true;//ノードレンズの枠線を描画する
+
+		//この計算で要素レンズリストがわかるよ
+		std::optional<std::unordered_map<std::pair<size_t, size_t>, sphereParam, HashPair>> nodelensParamsInBalllocal = std::nullopt;//行番号　レンズ番号がキーでパラメータをBalllocalで保存する
 		if(calcNodelenses){
+			//opt計算できます
+			nodelensParamsInBalllocal = decltype(nodelensParamsInBalllocal)::value_type();
+			auto& nodelensParamsRez = nodelensParamsInBalllocal.value();
+
 			//std::list<uleap>//マップ座標でのレンズ中心
 			for (std::decay<decltype(rowNum)>::type rd = 0; rd < rowNum; rd++) {
 				const ureal tlati = eachRowsDistance * rd - (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//lati方向の現在位置
@@ -222,6 +197,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					const auto localcenterInMap = DesignedMapToMap.prograte() * localcenterInMapDesigned;
 					const auto localcenterInBalllocalPolar = MapToLocalPolar(localcenterInMap);
 					const uvec3 localcenterInBalllocal = PolarToXyz(localcenterInBalllocalPolar);
+
+					//パラメータを登録
+					nodelensParamsRez[make_pair(rd, ld)] = sphereParam(localcenterInBalllocal, fabs(cos(localcenterInBalllocalPolar.y())));
 
 					//要素レンズを描画していく
 					
@@ -258,6 +236,40 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		};
 
 
+		//デベロップセクション
+		//まずヘッダを読み出す
+		const std::string framePath = R"(C:\local\user\lensball\lensball\resultsX\projectorFrames\)";
+		const std::string dicHeaderPath = R"(C:\local\user\lensball\lensball\resultsX\HexBall\projRefRayMap.head)";//辞書ヘッダが収まっている場所
+		projRefraDicHeader header;
+		{
+			ifstream ifs(dicHeaderPath, std::ios::binary);
+			cereal::BinaryInputArchive iarch(ifs);
+
+			iarch(header);
+
+			cout << "Loaded header\nh: " << header.horizontalRes << "\nv: " << header.verticalRes << "\nt: " << header.rotationRes << endl;
+		}
+
+		//解像度とかがわかる
+		//つぎに支店ごとにレイトレースしてどの画素に当たるか調べたい
+		const arrow3 devTargetRayInGlobal(uvec3(0,-5,0),uvec3(0,1,0));//こいつで現像する グローバル座標系
+		for (size_t rd = 0; rd < header.rotationRes; rd++) {
+			//まずはフレームを読み出す
+			const auto thisFrame = make_unique<bmpLib::img>();
+			bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
+
+			//つぎにローカルグローバル変換を計算する
+			const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
+			const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
+
+			//レイのローカルを計算できる
+			const arrow3 targetInBalllocal(GlobalToBallLocal.prograte() * devTargetRayInGlobal.org(), GlobalToBallLocal.prograte() * devTargetRayInGlobal.dir());
+
+			//レイの大まかな着弾点を計算する　これから
+		}
+
+
+
 		//スキャンをする
 		constexpr size_t projectorResInTheta = 256;//プロジェクタの縦側解像度 ホントはXGA
 		constexpr ureal projectorHalfAngleTheta = 60. / 180. * pi;//プロジェクトの投映角
@@ -270,7 +282,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		constexpr size_t scanThreadNum = 16;//スキャンに使うスレッド数
 		const std::string resultDicPrefix = "projRefRayMap";
 
-		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
+		constexpr bool scanLenses = false;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		constexpr bool logWarningInScan = false;//scan中の警告を表示する
 
@@ -447,7 +459,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		};
 		
 		//デコードする
-		DeserializeProjRefraDic(rezpath + branchpath + resultDicPrefix);
+		//DeserializeProjRefraDic(rezpath + branchpath + resultDicPrefix);
 
 		//表示する 3d 2dの順
 		//py::s("mlab.show()");
