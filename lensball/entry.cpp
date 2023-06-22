@@ -2,6 +2,7 @@
 #include "application.hpp"
 #include "matplotwrapper.hpp"
 #include "general.hpp"
+#include "bmpLib/bmp.hpp"
 
 using namespace std;
 
@@ -109,7 +110,7 @@ int main() {
 		const pyVecSeries<6> quiverSeries("mlabquiver");//ベクトル場用
 		const std::array<const string, 6> quiverPrefix = { "x","y","z","a","b","c" };
 
-		constexpr bool drawSphere = true;//レンズボール概形を描画する
+		constexpr bool drawSphere = false;//レンズボール概形を描画する
 		//Pythonをセットアップしてからレンズボールの概形を書く
 		constexpr ureal sphereRadius = 1.;
 		{
@@ -144,6 +145,38 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		//解像度
 		constexpr size_t verticalDirectionResolution = sqrt_constexpr(numOfProjectionPerACycle);//垂直解像度(一周に並んでいるレンズの数)
 		constexpr size_t horizontalDirectionResolution = numOfProjectionPerACycle / verticalDirectionResolution;//水平解像度　位置レンズあたりの投映数
+
+		//まずヘッダを読み出す
+		const std::string framePath = R"(C:\local\user\lensball\lensball\resultsX\projectorFrames\)";
+		const std::string dicHeaderPath =  R"(C:\local\user\lensball\lensball\resultsX\HexBall\projRefRayMap.head)";//辞書ヘッダが収まっている場所
+		projRefraDicHeader header;
+		{
+			ifstream ifs(dicHeaderPath, std::ios::binary);
+			cereal::BinaryInputArchive iarch(ifs);
+
+			iarch(header);
+
+			cout << "Loaded header\nh: " << header.horizontalRes << "\nv: " << header.verticalRes << "\nt: " << header.rotationRes << endl;
+		}
+
+		//解像度とかがわかる　シーンごとにループ
+		for (size_t rd = 0; rd < header.rotationRes; rd++) {
+			//まずはフレームを読み出す
+			const auto thisFrame = make_unique<bmpLib::img>();
+			bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
+
+
+		}
+
+
+
+
+
+
+
+
+
+
 
 
 		//レンズアレイを作成、描画する

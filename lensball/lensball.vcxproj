@@ -137,11 +137,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="bmpLib\bmp.cpp" />
     <ClCompile Include="entry.cpp" />
     <ClCompile Include="application.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="application.hpp" />
+    <ClInclude Include="bmpLib\bmp.hpp" />
     <ClInclude Include="general.hpp" />
     <ClInclude Include="matplotwrapper.hpp" />
   </ItemGroup>
