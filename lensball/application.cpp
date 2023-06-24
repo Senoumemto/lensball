@@ -338,6 +338,9 @@ uvec3 PolarToXyz(const uvec2& spolar) {
 		cos(spolar.y()) * sin(spolar.x()),
 		sin(spolar.y()));
 }
+uvec2 XyzToPolar(const uvec3& xyz) {
+	return uvec2((xyz.y() > 0. ? 1. : -1.) * acos(xyz.x() / sqrt(pow(xyz.x(), 2) + pow(xyz.y(), 2))), -acos(xyz.z() / sqrt(pow(xyz.x(), 2) + pow(xyz.y(), 2) + pow(xyz.z(), 2))) + (pi / 2.));
+}
 uvec3 Polar3DToXyz(const uvec3& phiThetaRadius) {
 	return uvec3(phiThetaRadius.z() * cos(phiThetaRadius.y()) * cos(phiThetaRadius.x()),
 		phiThetaRadius.z() * cos(phiThetaRadius.y()) * sin(phiThetaRadius.x()),

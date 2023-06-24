@@ -165,6 +165,7 @@ template<typename T> std::pair<T,T> PairMinusPlus(const T& t) {
 //À•WŒnŠÖŒW‚ÌŠÖ”
 //‹…–Ê‹ÉÀ•W‚ğ’¼ŒğÀ•W‚É•ÏŠ· //
 uvec3 PolarToXyz(const uvec2& spolar);
+uvec2 XyzToPolar(const uvec3& xyz);
 uvec3 Polar3DToXyz(const uvec3& phiThetaRadius);
 uvec2 MapToLocalPolar(const uvec2& xy);
 uvec2 PolarToMap(const uvec2& xy);

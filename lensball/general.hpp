@@ -37,6 +37,8 @@ using uvec2 = Eigen::Vector<ureal, 2>;
 using uvec3 = Eigen::Vector<ureal, 3>;
 using uvec4 = Eigen::Vector<ureal, 4>;
 
+
+using umat2 = Eigen::Matrix2<ureal>;
 using umat3 = Eigen::Matrix3<ureal>;
 using umat4 = Eigen::Matrix4<ureal>;
 
