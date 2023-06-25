@@ -331,8 +331,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			return hexvjunk;
 		}();//外接円の半径が1になるような六角形
-		constexpr size_t searchAreaInALen = lensNumInARow;//同じ行のレンズをどれだけ深追いして検索するか
-		constexpr size_t searchAreaInARow = rowNum;//同じ行のレンズをどれだけ深追いして検索するか
+		constexpr size_t searchAreaInALen = 5;//同じ行のレンズをどれだけ深追いして検索するか
+		constexpr size_t searchAreaInARow = 5;//同じ行のレンズをどれだけ深追いして検索するか
 		//あたりを付けたノードレンズから探索する範囲
 		//まずヘッダを読み出す
 		const std::string framePath = R"(C:\local\user\lensball\lensball\resultsX\projectorFrames\)";
@@ -378,7 +378,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 				//もしこのレイがボールに当たらなければそもそもいらんよ
 				if (!IntersectSphereAndArrow(lensballParam, devTargetRayInGlobal))return std::optional<decltype(pixListForTarget)>();
 
-				for (size_t rd = 75; rd < header.rotationRes; rd++) {
+				for (size_t rd = 0; rd < header.rotationRes; rd++) {
 					//まずはフレームを読み出す
 					const auto thisFrame = make_unique<bmpLib::img>();
 					bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
@@ -420,7 +420,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 							std::pair<size_t, size_t> hitlensIds;
 							optional<std::pair<sphereParam, uvec3>> hitlensParamInBalllocal;//対象のレンズパラメータと衝突法線　ボールローカルで
 							for (size_t rilini = 0; rilini < searchAreaInARow; rilini++) {//検索範囲は全部の行
-								const size_t rid = rilini;// GetBisideIndex(rilini, centerRawIndex, rawSearchWay, rowNum);//当たりをつけたところから放射状に探索する
+								const size_t rid = GetBisideIndex(rilini, centerRawIndex, rawSearchWay, rowNum);//当たりをつけたところから放射状に探索する
 
 								//つぎにphiから何番目のレンズかを考える
 								const ureal regRayDirLonn = [&] {
@@ -440,7 +440,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 								//ではレンズの当たり判定を始める
 								for (size_t lidlini = 0; lidlini < searchAreaInALen; lidlini++) {
-									const size_t lid = lidlini;// GetBisideIndex(lidlini, centerLensIndex, lensSearchWay, lensNumInARow);//当たりをつけたところから放射状に探索する
+									const size_t lid = GetBisideIndex(lidlini, centerLensIndex, lensSearchWay, lensNumInARow);//当たりをつけたところから放射状に探索する
 
 									const auto thislensparamInBalllocal = nodelensParamsInBalllocal.value()[make_pair(rid, lid)];
 
@@ -466,20 +466,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 											closestT = thisnodeT.t;
 										}
 
-
-										////つまりyz座標だけが問題
-										////本当かしら とりあえず概形の中に入っているかどうかを判定
-										//if (NaihouHanteiX(uvec2(regHitposVsNodeInNodelocal.y(), regHitposVsNodeInNodelocal.z()), regularHexagon)) {
-										//	//そもそも絶対に球面上だよねif (hitposVsNodeInNodelocal.norm() >= thislensparamInBalllocal.second)throw logic_error("判定がだめ");
-										//	printf("ok r=%u l=%u\n", rid, lid);
-										//	//hitlensIds.push_back(make_pair(rid, lid));
-
-										//	//法線を計算する
-										//	const uvec3 normInBalllocal = (hitposVsNodeInBalllocal - thislensparamInBalllocal.first) / thislensparamInBalllocal.second;
-										//	//hitlensParamInBalllocal = make_pair(thislensparamInBalllocal, normInBalllocal);
-										//	break;
-										//}
-
 									}
 
 									if (hitlensParamInBalllocal)break;
@@ -490,7 +476,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 							//見つからなかったらやばすぎる　レンズボールには当たったのに要素レンズには当たっていない状態
 							if (!hitlensParamInBalllocal)
-								throw logic_error("レンズボールには当たったのに要素レンズには当たっていないってやばいよ");
+								throw escapeException();
+								//throw logic_error("レンズボールには当たったのに要素レンズには当たっていないってやばいよ");
 
 							//つぎにスネルの法則で球を演算する
 							ray3 targetSeriesInBalllocal(targetInBalllocal);
@@ -542,6 +529,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 							if (pixpos.x() >= 0 && pixpos.x() < projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < projectorResInTheta)
 								pixListForTarget.push_back(Eigen::Vector3i(pixpos.x(), pixpos.y(), rd));
 						}
+						else break;//レンズボールに当たらなかったらあんま意味ない
 					}
 					//全反射とかでこれ以上判定する必要がなかったので逃げてきた
 					catch (escapeException& ex) {}
@@ -553,10 +541,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			auto cameraRayIte = cameraRayList.cbegin();
 			for (size_t y = 0; y < cameraResH; y++)
 				for (size_t x = 0; x < cameraResW; x++) {
-					if (x == 5 && y == 7) {
-						cout << x << "\t" << y << endl;
-						FindPixelsFromARay(*cameraRayIte);
-					}
+					cout << x << "\t" << y << endl;
+					FindPixelsFromARay(*cameraRayIte);
+
 					cameraRayIte++;
 				}
 
