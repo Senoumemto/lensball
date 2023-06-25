@@ -151,10 +151,17 @@ void DeserializeProjRefraDic(const std::string& path) {
 }
 
 
-ureal NormalizeAngle(ureal Angle)
-{
+ureal NormalizeAngle(ureal Angle){
 	long ofs = (*(long*)&Angle & 0x80000000) | 0x3F000000;
 	return (Angle - ((int)(Angle * (1./pi) + *(ureal*)&ofs) * (2.*pi)));
+}
+
+//いろいろなものを正規化する　整数番
+template<typename intger>intger NormalizeIntger(const intger& i,const intger& siz) {
+	//正ならmodすればよし
+	if (i > 0)return i % siz;
+	if (i % siz==0)return 0;//sizの整数倍なら絶対0
+	else return siz + (i % siz);//負なら全体から引けば良い
 }
 
 //0~始まるインデックスを、ある中心から両側に検索するような形に変換する
@@ -167,13 +174,12 @@ size_t GetBisideIndex(size_t lini,size_t center, int way,const size_t indSiz) {
 	//-max/2まで行くかな
 	int signedIndex = (sign * (int)bilocalSiz + center);
 	//マイナスならmaxを足す
-	return (signedIndex < 0 ? signedIndex + indSiz : signedIndex) % indSiz;
+	return NormalizeIntger<signed int>(signedIndex, indSiz);
 }
 
 int main() {
 
 	try {
-
 		//開始時刻を記録してスタート
 		const auto startTimePoint = std::chrono::system_clock::now();
 		std::cout << "Start: " << startTimePoint << endl;
@@ -338,8 +344,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			return hexvjunk;
 		}();//外接円の半径が1になるような六角形
-		constexpr size_t searchAreaInALen = lensNumInARow;//同じ行のレンズをどれだけ深追いして検索するか
-		constexpr size_t searchAreaInARow = rowNum;//列をどれだけ深追いして検索するか
+		constexpr size_t searchAreaInALen = 5;//同じ行のレンズをどれだけ深追いして検索するか
+		constexpr size_t searchAreaInARow = 5;//列をどれだけ深追いして検索するか
 		//あたりを付けたノードレンズから探索する範囲
 		//まずヘッダを読み出す
 		const std::string framePath = R"(C:\local\user\lensball\lensball\resultsX\projectorFrames\)";
@@ -350,7 +356,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		//現像に使うカメラ
 		constexpr ureal fovHalf = 3. / 180. * pi;
 		const uvec3 cameraPos(uvec3(30, 0., 0.));//カメラ位置
-		constexpr size_t cameraResW = 16, cameraResH = 16;
+		constexpr size_t cameraResW = 64, cameraResH = 64;
 
 		constexpr bool developImage = true;
 		constexpr bool printMessagesInDevelopping = false;//デベロップ中のメッセージを出力するか
@@ -427,7 +433,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 								return thisscale * zeroSetRayDir;
 							}();
-							const int centerRawIndex = round(regRayDirLati);//四捨五入するともっともらしいインデックスがわかる
+							const int centerRawIndex = NormalizeIntger<signed int>(round(regRayDirLati), rowNum);//四捨五入するともっともらしいインデックスがわかる
 							const int rawSearchWay = (regRayDirLati - (ureal)centerRawIndex) > 0. ? +1 : -1;//検索方向
 
 							//ではここからレンズに当たりをつける
@@ -451,7 +457,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 									return thisscale * zeroSetRayDir;
 								}();
 								const bool eachFlag = rid % 2;//交互に切り替わるフラグ 立っているときは行が半周進んでる
-								const int centerLensIndex = round(regRayDirLonn - (eachFlag ? 0.5 : 0.));//これはオフセットがない　つまりよりマイナス側から始まっている行にいる場合のインデックス そうでなければ-0.5してから丸める←やりました
+								const int centerLensIndex = NormalizeIntger<signed int>(round(regRayDirLonn - (eachFlag ? 0.5 : 0.)),lensNumInARow);//これはオフセットがない　つまりよりマイナス側から始まっている行にいる場合のインデックス そうでなければ-0.5してから丸める←やりました
 								const int lensSearchWay = (regRayDirLonn - (ureal)centerLensIndex) > 0. ? +1 : -1;//隣り合うレンズのもっともらしいインデックスもわかる
 
 								//ではレンズの当たり判定を始める
