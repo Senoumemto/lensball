@@ -22,11 +22,14 @@
 
 namespace bmpLib {
 
-	typedef struct {                      /* 1ピクセルあたりの赤緑青の各輝度     */
+	struct color {                      /* 1ピクセルあたりの赤緑青の各輝度     */
 		unsigned char r;
 		unsigned char g;
 		unsigned char b;
-	} color;
+
+		color(unsigned char _r, unsigned char _g, unsigned char _b):r(_r),g(_g),b(_b){}
+		color() = default;
+	} ;
 
 	typedef struct {
 		long height;

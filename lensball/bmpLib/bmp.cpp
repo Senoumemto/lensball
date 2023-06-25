@@ -158,6 +158,7 @@ void bmpLib::WriteBmp(const char* filename, img* tp) {
     Bmp_header_size = HEADERSIZE;
     Bmp_info_header_size = 40;
     Bmp_planes = 1;
+    Bmp_comp = 0;
 
     Real_width = tp->width * 3 + tp->width % 4;  /* 4byte ‹«ŠE‚É‚ ‚í‚¹‚é‚½‚ß‚ÉŽÀÛ‚Ì•‚ÌŒvŽZ */
 
@@ -182,6 +183,7 @@ void bmpLib::WriteBmp(const char* filename, img* tp) {
     memcpy(Bmp_headbuf + 22, &tp->height, sizeof(Bmp_height));
     memcpy(Bmp_headbuf + 26, &Bmp_planes, sizeof(Bmp_planes));
     memcpy(Bmp_headbuf + 28, &Bmp_color, sizeof(Bmp_color));
+    memcpy(Bmp_headbuf + 30, &Bmp_comp, sizeof(Bmp_comp));
     memcpy(Bmp_headbuf + 34, &Bmp_image_size, sizeof(Bmp_image_size));
     memcpy(Bmp_headbuf + 38, &Bmp_xppm, sizeof(Bmp_xppm));
     memcpy(Bmp_headbuf + 42, &Bmp_yppm, sizeof(Bmp_yppm));
