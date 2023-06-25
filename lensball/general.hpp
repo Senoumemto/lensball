@@ -176,4 +176,9 @@ namespace std {
 };
 #endif
 
+//なんかセクションから抜けるときに使う例外　とくにエラーではない
+class escapeException :public std::exception {
+
+};
+
 #endif

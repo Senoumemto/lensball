@@ -177,6 +177,14 @@ void DeserializeProjRefraDic(const std::string& path) {
 	}
 }
 
+
+ureal NormalizeAngle(ureal Angle)
+{
+	long ofs = (*(long*)&Angle & 0x80000000) | 0x3F000000;
+	return (Angle - ((int)(Angle * (1./pi) + *(ureal*)&ofs) * (2.*pi)));
+}
+
+
 int main() {
 
 	try {
@@ -230,9 +238,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		constexpr size_t horizontalDirectionResolution = numOfProjectionPerACycle / verticalDirectionResolution;//水平解像度　位置レンズあたりの投映数
 
 		//プロジェクタのパラメータ
-		constexpr size_t projectorResInTheta = 256;//プロジェクタの縦側解像度 ホントはXGA
+		constexpr size_t projectorResInTheta = 768;//プロジェクタの縦側解像度 ホントはXGA
 		constexpr ureal projectorHalfAngleTheta = 60. / 180. * pi;//プロジェクトの投映角
-		constexpr size_t projectorResInPhi = 256; // プロジェクタの横側解像度 ホントはXGA
+		constexpr size_t projectorResInPhi = 1024; // プロジェクタの横側解像度 ホントはXGA
 		constexpr ureal projectorHalfAnglePhi = projectorHalfAngleTheta * (projectorResInPhi / (ureal)projectorResInTheta);//プロジェクトの投映角
 
 
@@ -331,7 +339,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 		//デベロップセクション
 		constexpr ureal nodelensEta = 1.5;//ノードレンズの比屈折率
-		const sphereParam apertureProjector(uvec3::Zero(), sphereRadius / 40.);//ここにあたったらプロジェクターから出たってこと
+		const sphereParam apertureProjector(uvec3::Zero(), sphereRadius / 20.);//ここにあたったらプロジェクターから出たってこと
 		const auto regularHexagon = [&] {
 			auto hexvjunk = MakeHexagon(sqrt(3.)/2.);//六角形の頂点
 			hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
@@ -352,169 +360,168 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			std::cout << "Loaded header\nh: " << header.horizontalRes << "\nv: " << header.verticalRes << "\nt: " << header.rotationRes << endl;
 		}
 
+
+		//ある視点を考える
+		constexpr ureal fovHalf = 30. / 180. * pi;
+		const uvec3 cameraPos(uvec3(5., 0., 0.));//カメラ位置
+		constexpr size_t cameraResW = 16, cameraResH = 16;
+		std::list<arrow3>cameraRayList;
+		for (size_t y = 0; y < projectorResInTheta; y++) {
+			const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(cameraResH - 1));
+			for (size_t x = 0; x < cameraResW; x++) {
+				//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
+
+				const ureal scx = uleap(PairMinusPlus(1.*(cameraResW / cameraResH)), x / (ureal)(cameraResW - 1));
+				double scz = 1. / tan(fovHalf);//視野角を決める事ができる
+
+				//orgが0 wayがスクリーンの正規化
+				Eigen::Vector3d scnormed = Eigen::Vector3d(scz, scy, -scx).normalized();
+
+				cameraRayList.push_back(arrow3(cameraPos, scnormed));
+			}
+		}
+
 		//解像度とかがわかる
-		//つぎに支店ごとにレイトレースしてどの画素に当たるか調べたい
-		const arrow3 devTargetRayInGlobal(uvec3(0, -5, 0), uvec3(0, 1, 0).normalized());//こいつで現像する グローバル座標系
-		std::list<Eigen::Vector3i> pixListForTarget;//このレイがどこの画素に当たるか
-		for (size_t rd = 591; rd < header.rotationRes; rd++) {
-			//まずはフレームを読み出す
-			const auto thisFrame = make_unique<bmpLib::img>();
-			bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
+		//つぎに視点ごとにレイトレースしてどの画素に当たるか調べたい
+		const auto FindPixelsFromARay=[&](const arrow3 devTargetRayInGlobal) {
+			std::list<Eigen::Vector3i> pixListForTarget;//このレイがどこの画素に当たるか
+			constexpr bool printMessagesInDevelopping = false;
+			for (size_t rd = 0; rd < header.rotationRes; rd++) {
+				//まずはフレームを読み出す
+				const auto thisFrame = make_unique<bmpLib::img>();
+				bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
 
-			//つぎにローカルグローバル変換を計算する
-			const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
-			const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
+				//つぎにローカルグローバル変換を計算する
+				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(numOfProjectionPerACycle)) + (2. * pi / (ureal)(numOfProjectionPerACycle + 1) / 2.);//ボールの回転角度
+				const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
 
-			//レイのローカルを計算できる
-			const arrow3 targetInBalllocal(GlobalToBallLocal.prograte() * devTargetRayInGlobal.org(), GlobalToBallLocal.prograte() * devTargetRayInGlobal.dir());
-			try {
-				//レイの大まかな着弾点を計算する
-				//Sphereのどこに当たりますか
-				const auto targetTOpt = IntersectSphereAndArrow(lensballParam, targetInBalllocal);
-				if (targetTOpt) {
-					const auto& targetTVsBall = targetTOpt.value();
-					const uvec3 hitPosVsSphereInBalllocal = targetInBalllocal.dir() * targetTVsBall + targetInBalllocal.org();//Balllocalでの交差位置　レンズボールとターゲットの
-					const uvec2 hitposVsSphereInBalllocalPolar = XyzToPolar(hitPosVsSphereInBalllocal);
-					const uvec2 hitposVsSphereInMap = PolarToMap(hitposVsSphereInBalllocalPolar);
-					const uvec2 hitposVsSphereInMapD = DesignedMapToMap.untiprograte() * hitposVsSphereInMap;
-					py::sf("plt.scatter(%f,%f,color=(%f,0,0))", hitposVsSphereInMapD.x(), hitposVsSphereInMapD.y(),rd==11?1.:0.);
-
-					//つぎに大まかなレンズの位置を確定する
-					const ureal regRayDirLati = [&] {
-						const ureal zerothRowlati = -(eachRowsDistance * (ureal)(rowNum - 1) / 2.);//zero番目の行の高さ
-						const ureal zeroSetRayDir = hitposVsSphereInMapD.y() - zerothRowlati;//0番目の行の高さに始点を合わせたレイの高さ
-						const ureal finalRowlati = (eachRowsDistance * (ureal)(rowNum - 1) / 2.);//rowNum-1番目の行の高さ
-						//スケーリング　fin~0までのスケールがrowNum-1~0までのスケールになって欲しい
-						const ureal thisscale = (ureal)(rowNum - 1 - 0) / (finalRowlati - zerothRowlati);
-
-						return thisscale * zeroSetRayDir;
-					}();
+				//レイのローカルを計算できる
+				const arrow3 targetInBalllocal(GlobalToBallLocal.prograte() * devTargetRayInGlobal.org(), GlobalToBallLocal.prograte() * devTargetRayInGlobal.dir());
 
 
-					const int centerRawIndex = round(regRayDirLati);//四捨五入するともっともらしいインデックスがわかる
-					const int neibourRawIndex = (regRayDirLati - (ureal)centerRawIndex) > 0. ? centerRawIndex + 1 : centerRawIndex - 1;//隣り合う行のもっともらしいインデックスもわかる
-					printf("row index %d,%d\n", centerRawIndex, neibourRawIndex);
+				//このレイがプロジェクタに当たるか
+				try {
+					const auto targetTOpt = IntersectSphereAndArrow(lensballParam, targetInBalllocal);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
+					if (targetTOpt) {
+						const auto& targetTVsBall = targetTOpt.value();
+						const uvec3 hitPosVsSphereInBalllocal = targetInBalllocal.dir() * targetTVsBall + targetInBalllocal.org();//Balllocalでの交差位置　レンズボールとターゲットの
+						const uvec3 hitPosVsSphereInGlobal = GlobalToBallLocal.untiprograte() * hitPosVsSphereInBalllocal;
+						const uvec2 hitposVsSphereInBalllocalPolar = XyzToPolar(hitPosVsSphereInBalllocal);
+						const uvec2 hitposVsSphereInMap = PolarToMap(hitposVsSphereInBalllocalPolar);
+						const uvec2 hitposVsSphereInMapD = DesignedMapToMap.untiprograte() * hitposVsSphereInMap;
+						if (printMessagesInDevelopping)py::sf("plt.scatter(%f,%f,color=(%f,0,0))", hitposVsSphereInMapD.x(), hitposVsSphereInMapD.y(), rd == 11 ? 1. : 0.);
 
-					//ではここから行中の当たり判定を始める
-					optional<std::pair<sphereParam, uvec3>> hitlensParamInBalllocal;//対象のレンズパラメータと衝突法線　ボールローカルで
-					for (const auto& rid : { centerRawIndex,neibourRawIndex }) {
-						//つぎにphiから何番目のレンズかを考える
-						const ureal regRayDirLonn = [&] {
-							//const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
 
-							const ureal zerothlenslonn = -rowLength / 2.;//-rowLength/2.が最初のレンズの位置　場合によって前後するけどね
-							const ureal zeroSetRayDir = hitposVsSphereInMapD.x() - zerothlenslonn;//zero番目のレンズの場所をzeroに
-							const ureal finlenslonn = uleap(PairMinusPlus(rowLength / 2.), (lensNumInARow - 1) / (ureal)lensNumInARow);//最後のレンズの場所
-							//スケーリング　fin~0までのスケールがlensNumInCollum-1~0までのスケールになって欲しい
-							const ureal thisscale = (ureal)(lensNumInARow - 1 - 0) / (finlenslonn - zerothlenslonn);
+						//ではここから行中の当たり判定を始める
+						optional<std::pair<sphereParam, uvec3>> hitlensParamInBalllocal;//対象のレンズパラメータと衝突法線　ボールローカルで
+						for (size_t rid = 0; rid < rowNum; rid++) {
 
-							return thisscale * zeroSetRayDir;
-						}();
-						const bool eachFlag = rid % 2;//交互に切り替わるフラグ 立っているときは行が半周進んでる
+							//ではレンズの当たり判定を始める
+							for (size_t lid = 0; lid < lensNumInARow; lid++) {
+								const auto thislensparamInBalllocal = nodelensParamsInBalllocal.value()[make_pair(rid, lid)];
 
-						const int centerLensIndex = round(regRayDirLonn - (eachFlag ? 0.5 : 0.));//これはオフセットがない　つまりよりマイナス側から始まっている行にいる場合のインデックス そうでなければ-0.5してから丸める←やりました
-						const int neibourLensIndex = (regRayDirLonn - (ureal)centerLensIndex) > 0. ? centerLensIndex + 1 : centerLensIndex - 1;//隣り合うレンズのもっともらしいインデックスもわかる
-						printf("lens index %d,%d\n", centerLensIndex, neibourLensIndex);
+								//球と当たり判定する
+								const auto thisnodeT = IntersectSphereAndArrow(thislensparamInBalllocal, targetInBalllocal);
+								if (thisnodeT) {
+									const uvec3 hitposVsNodeInBalllocal = targetInBalllocal.dir() * thisnodeT.value() + targetInBalllocal.org();//Balllocalでの交差位置 ノードレンズの
+									//つぎにこれが六角形の範囲から逸脱していないか確認する必要がある　つまり要素レンズローカルにする必要がある(0,0)がx方向で有ることに留意して
+									const auto BalllocalToNodeLocalPhi = Eigen::AngleAxis<ureal>(-hitposVsSphereInBalllocalPolar.x(), uvec3::UnitZ());
+									const auto BalllocalToNodeLocalTheta = Eigen::AngleAxis<ureal>(-hitposVsSphereInBalllocalPolar.y(), uvec3::UnitY());
 
-						//ではレンズの当たり判定を始める
-						for (const auto& lid : { centerLensIndex,neibourLensIndex }) {
-							const auto thislensparamInBalllocal = nodelensParamsInBalllocal.value()[make_pair(rid, lid)];
+									const uvec3 hitposVsNodeInNodelocal = BalllocalToNodeLocalTheta * BalllocalToNodeLocalPhi * (hitposVsNodeInBalllocal - thislensparamInBalllocal.first);//ノードレンズの光軸をx軸としたヒット座標
+									const uvec3 regHitposVsNodeInNodelocal = hitposVsNodeInNodelocal / thislensparamInBalllocal.second;//半径で正規化
 
-							//球と当たり判定する
-							const auto thisnodeT = IntersectSphereAndArrow(thislensparamInBalllocal, targetInBalllocal);
-							if (thisnodeT) {
-								const uvec3 hitposVsNodeInBalllocal = targetInBalllocal.dir() * thisnodeT.value() + targetInBalllocal.org();//Balllocalでの交差位置 ノードレンズの
-								//つぎにこれが六角形の範囲から逸脱していないか確認する必要がある　つまり要素レンズローカルにする必要がある(0,0)がx方向で有ることに留意して
-								const auto BalllocalToNodeLocalPhi = Eigen::AngleAxis<ureal>(-hitposVsSphereInBalllocalPolar.x(), uvec3::UnitZ());
-								const auto BalllocalToNodeLocalTheta = Eigen::AngleAxis<ureal>(-hitposVsSphereInBalllocalPolar.y(), uvec3::UnitY());
+									//つまりyz座標だけが問題
+									//本当かしら とりあえず概形の中に入っているかどうかを判定
+									if (NaihouHanteiX(uvec2(regHitposVsNodeInNodelocal.y(), regHitposVsNodeInNodelocal.z()), regularHexagon)) {
+										//そもそも絶対に球面上だよねif (hitposVsNodeInNodelocal.norm() >= thislensparamInBalllocal.second)throw logic_error("判定がだめ");
+										if (printMessagesInDevelopping)printf("ok r=%u l=%u\n", rid, lid);
 
-								const uvec3 hitposVsNodeInNodelocal = BalllocalToNodeLocalTheta * BalllocalToNodeLocalPhi * (hitposVsNodeInBalllocal - thislensparamInBalllocal.first);//ノードレンズの光軸をx軸としたヒット座標
-								const uvec3 regHitposVsNodeInNodelocal = hitposVsNodeInNodelocal / thislensparamInBalllocal.second;//半径で正規化
+										//	//とりあえずテスト　これがcenterでない可能性はあるの?
+										//	if (rid != centerRawIndex || lid != centerLensIndex)
+										//		if (logWarningInScan)std::cout << "別にエラーではないけど想像したのと違う!" << endl;
+										//法線を計算する
+										const uvec3 normInBalllocal = (hitposVsNodeInBalllocal - thislensparamInBalllocal.first) / thislensparamInBalllocal.second;
+										hitlensParamInBalllocal = make_pair(thislensparamInBalllocal, normInBalllocal);
+										break;
+									}
 
-								//つまりyz座標だけが問題
-								//本当かしら とりあえず概形の中に入っているかどうかを判定
-								if (NaihouHanteiX(uvec2(regHitposVsNodeInNodelocal.y(), regHitposVsNodeInNodelocal.z()), regularHexagon)) {
-									//そもそも絶対に球面上だよねif (hitposVsNodeInNodelocal.norm() >= thislensparamInBalllocal.second)throw logic_error("判定がだめ");
-									printf("ok r=%d l=%d\n", rid, lid);
-
-									//	//とりあえずテスト　これがcenterでない可能性はあるの?
-									//	if (rid != centerRawIndex || lid != centerLensIndex)
-									//		if (logWarningInScan)std::cout << "別にエラーではないけど想像したのと違う!" << endl;
-									//法線を計算する
-									const uvec3 normInBalllocal = (hitposVsNodeInBalllocal - thislensparamInBalllocal.first) / thislensparamInBalllocal.second;
-									hitlensParamInBalllocal = make_pair(thislensparamInBalllocal, normInBalllocal);
-									break;
 								}
 
+								if (hitlensParamInBalllocal)break;
 							}
 
 							if (hitlensParamInBalllocal)break;
 						}
 
-						if (hitlensParamInBalllocal)break;
+						//見つからなかったらやばすぎる　レンズボールには当たったのに要素レンズには当たっていない状態
+						if (!hitlensParamInBalllocal)
+							throw logic_error("レンズボールには当たったのに要素レンズには当たっていないってやばいよ");
+
+						//つぎにスネルの法則で球を演算する
+						ray3 targetSeriesInBalllocal(targetInBalllocal);
+						const auto fIntersect = IntersectSphere(targetSeriesInBalllocal.back(), hitlensParamInBalllocal.value().first.first, hitlensParamInBalllocal.value().first.second);
+						if (!fIntersect.isHit)throw logic_error("当たり判定のロジックがバグってます");
+						fIntersect.ApplyToRay(targetSeriesInBalllocal);
+						if (!RefractSnell(targetSeriesInBalllocal, fIntersect.norm, nodelensEta)) {
+							if (printMessagesInDevelopping)cout << "全反射が起きた(入射時)" << endl;
+							throw escapeException();//レイトレースはしなくていい　次のレイに
+						}
+
+						//さらに対面の判定をする
+						const auto bIntersect = IntersectSphere(targetSeriesInBalllocal.back(), hitlensParamInBalllocal.value().first.first, hitlensParamInBalllocal.value().first.second);
+						if (!bIntersect.isHit)throw logic_error("当たり判定のロジックがバグってます");
+						bIntersect.ApplyToRay(targetSeriesInBalllocal);
+						if (!RefractSnell(targetSeriesInBalllocal, -bIntersect.norm, 1. / nodelensEta)) {
+							if (printMessagesInDevelopping)cout << "全反射が起きた(出射時)" << endl;
+							throw escapeException();//レイトレースはしなくていい　次のレイに
+						}
+
+						//これでレンズボール内での方向がわかった
+						const auto& refractedArrow = targetSeriesInBalllocal.back();
+						/*ResetPyVecSeries(mlabSeries);
+						for (const auto& a : targetSeriesInBalllocal)
+							AppendPyVecSeries(mlabSeries, a.org());
+						py::sf("mlab.plot3d(%s,tube_radius=0.01)", GetPySeriesForPlot(mlabSeries));
+						py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", refractedArrow.org().x(), refractedArrow.org().y(), refractedArrow.org().z(), refractedArrow.dir().x(), refractedArrow.dir().y(), refractedArrow.dir().z());*/
+
+						//つぎにプロジェクターのどの画素に当たるかを解く
+						//まず開口に当たるかい
+						auto apertureT = IntersectSphereAndArrow(apertureProjector, refractedArrow);
+						if (!apertureT) {
+							//プロジェクタには入社しなかった
+							if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
+							throw escapeException();//レイトレースはしなくていい　次のレイに
+						}
+
+						//開口にあたったらレイの向きで画素を判断できる
+						const uvec3 refractedDirInGlobal = GlobalToBallLocal.untiprograte() * refractedArrow.dir();
+						//限界の角度(プロジェクタの投映角度)との比率でUV座標を算出できる
+						const uvec2 refractedDirInGlobalPolar = XyzToPolar(refractedDirInGlobal);//投映はx方向(phi=0)に行われるのだからプロジェクタ中心は(phi=pi theta=0.)
+
+						//各座標を0~1に正規化してくれるはず
+						const uvec2 regpos = 0.5 * (uvec2(NormalizeAngle((refractedDirInGlobalPolar.x() - pi)) / projectorHalfAnglePhi, NormalizeAngle(refractedDirInGlobalPolar.y()) / projectorHalfAngleTheta) + uvec2(1., 1.));
+
+						//座標にする
+						Eigen::Vector2i pixpos(regpos.x() * projectorResInPhi, regpos.y() * projectorHalfAngleTheta);
+						//無効な座標でなければリストに入れる
+						if (pixpos.x() >= 0 && pixpos.x() < projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < projectorResInTheta)
+							pixListForTarget.push_back(Eigen::Vector3i(pixpos.x(), pixpos.y(), rd));
 					}
-
-					//見つからなかったらやばすぎる　レンズボールには当たったのに要素レンズには当たっていない状態
-					if (!hitlensParamInBalllocal)
-						throw runtime_error("レンズボールには当たったのに要素レンズには当たっていないってやばいよ");
-
-					//つぎにスネルの法則で球を演算する
-					ray3 targetSeriesInBalllocal(targetInBalllocal);
-					const auto fIntersect = IntersectSphere(targetSeriesInBalllocal.back(), hitlensParamInBalllocal.value().first.first, hitlensParamInBalllocal.value().first.second);
-					if (!fIntersect.isHit)throw logic_error("当たり判定のロジックがバグってます");
-					fIntersect.ApplyToRay(targetSeriesInBalllocal);
-					if (!RefractSnell(targetSeriesInBalllocal, fIntersect.norm, nodelensEta))throw runtime_error("全反射が起きた(入射時)");
-
-					//さらに対面の判定をする
-					const auto bIntersect = IntersectSphere(targetSeriesInBalllocal.back(), hitlensParamInBalllocal.value().first.first, hitlensParamInBalllocal.value().first.second);
-					if (!bIntersect.isHit)throw logic_error("当たり判定のロジックがバグってます");
-					bIntersect.ApplyToRay(targetSeriesInBalllocal);
-					if (!RefractSnell(targetSeriesInBalllocal, -bIntersect.norm, 1. / nodelensEta)) throw runtime_error("全反射が起きた(出射時)");
-
-					//これでレンズボール内での方向がわかった
-					const auto& refractedArrow = targetSeriesInBalllocal.back();
-					/*ResetPyVecSeries(mlabSeries);
-					for (const auto& a : targetSeriesInBalllocal)
-						AppendPyVecSeries(mlabSeries, a.org());
-					py::sf("mlab.plot3d(%s,tube_radius=0.01)", GetPySeriesForPlot(mlabSeries));
-					py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", refractedArrow.org().x(), refractedArrow.org().y(), refractedArrow.org().z(), refractedArrow.dir().x(), refractedArrow.dir().y(), refractedArrow.dir().z());*/
-
-					//つぎにプロジェクターのどの画素に当たるかを解く
-					//まず開口に当たるかい
-					auto apertureT = IntersectSphereAndArrow(apertureProjector, refractedArrow);
-					if (!apertureT)continue;
-
-					//開口にあたったらレイの向きで画素を判断できる
-					const uvec3 refractedDirInGlobal = GlobalToBallLocal.untiprograte() * refractedArrow.dir();
-					//限界の角度(プロジェクタの投映角度)との比率でUV座標を算出できる
-					const uvec2 refractedDirInGlobalPolar = XyzToPolar(refractedDirInGlobal);//投映はx方向(phi=0)に行われるのだからプロジェクタ中心は(phi=pi theta=0.)
-					const uvec2 uvpos = uvec2(refractedDirInGlobalPolar.x() / projectorHalfAnglePhi, refractedDirInGlobalPolar.y() / projectorHalfAngleTheta) - uvec2(pi, 0.);
-
-					std::cout << uvpos << endl;
-
-					//pixListForTarget.push_back();
-
-				//球を描画する
-					constexpr size_t sphereResolution = 20;
-					if (1)py::sf(R"(
-[sphphi,sphtheta] = np.mgrid[0:2*np.pi:%dj,0:np.pi:%dj]
-spx = np.cos(sphphi)*np.sin(sphtheta)
-spy = np.sin(sphphi)*np.sin(sphtheta)
-spz = np.cos(sphtheta)
-mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )  
-)", sphereResolution, sphereResolution, apertureProjector.second, apertureProjector.second, apertureProjector.second);
-
-					int a = 0;
 				}
-				else;//レンズボールに当たらんかったらとりあえず判定しないでおく
-			}
-			catch (std::runtime_error &ex) {
-				std::cout << ex.what() << endl;
-			}
-			break;
-		}
+				//全反射とかでこれ以上判定する必要がなかったので逃げてきた
+				catch (escapeException& ex) {}
 
+			}
 
+			return pixListForTarget;
+		};
+		auto cameraRayIte = cameraRayList.cbegin();
+		for (size_t y = 0; y < cameraResH; y++)
+			for (size_t x = 0; x < cameraResW; x++) {
+				cout << x << "\t" << y << endl;
+				FindPixelsFromARay(*cameraRayIte);
+			}
 
 
 
