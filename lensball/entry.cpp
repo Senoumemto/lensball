@@ -337,7 +337,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 		//デベロップセクション
 		constexpr ureal nodelensEta = 1.5;//ノードレンズの比屈折率
-		const sphereParam apertureProjector(uvec3::Zero(), sphereRadius/10.);//ここにあたったらプロジェクターから出たってこと
+		const sphereParam apertureProjector(uvec3::Zero(), sphereRadius/20.);//ここにあたったらプロジェクターから出たってこと
 		const auto regularHexagon = [&] {
 			auto hexvjunk = MakeHexagon(sqrt(3.)/2.);//六角形の頂点
 			hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
@@ -401,8 +401,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 				//あるシーンでのカメラ映像をけいさんする
 			const auto GetAFrameOfAScene = [&](const size_t rd,const decltype(finFlagOfEachDevThread)::iterator finflag) {
 				////まずはフレームを読み出す
-				//const auto thisFrame = make_unique<bmpLib::img>();
-				//bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
+				const auto thisFrame = make_unique<bmpLib::img>();
+				bmpLib::ReadBmp((framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
 
 
 				//つぎにローカルグローバル変換を計算する
@@ -411,7 +411,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 
 				//カメラのあるピクセルの色を求める
-				const auto GetColorOfCamPix = [=](const decltype(cameraRayList)::const_iterator cameraRayIte, const Eigen::Vector2i& pixOfCam) {//レイを特定してローカルを計算
+				const auto GetColorOfCamPix = [&](const decltype(cameraRayList)::const_iterator cameraRayIte, const Eigen::Vector2i& pixOfCam) {//レイを特定してローカルを計算
 					const arrow3 targetInBalllocal(GlobalToBallLocal.prograte() * (*cameraRayIte).org(), GlobalToBallLocal.prograte() * (*cameraRayIte).dir());
 					//このレイがプロジェクタに当たるか
 					const auto hitRezVsSphere = IntersectSphere(targetInBalllocal, lensballParam.first, lensballParam.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
@@ -536,8 +536,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 						//無効な座標でなければリストに入れる
 						if (pixpos.x() >= 0 && pixpos.x() < projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < projectorResInTheta) {
-
-							return std::optional<uvec3>(uvec3(0.1,0.1,0.1));
+							const auto pixColor = thisFrame.get()->data.at(pixpos.y()).at(pixpos.x());//フレームから色を取り出す
+							return std::optional<uvec3>(uvec3(pixColor.r, pixColor.g, pixColor.b));
 							//rez->push_back(Eigen::Vector3i(pixpos.x(), pixpos.y(), rd));
 						}
 					}
@@ -601,13 +601,15 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			bmpLib::img myImage;
 			myImage.width = cameraResW;
 			myImage.data.resize(cameraResH);
-
 			myImage.height = cameraResH;
 			for (int y = 0; y < myImage.height; y++) {
 				myImage.data.at(myImage.height - 1 - y).resize(cameraResW);
 				for (int x = 0; x < myImage.width; x++) {
 					const auto pixIte = colorList.find(Eigen::Vector2i(x, y));//対応したピクセルを設置
-					myImage.data[myImage.height - 1 - y][x] = bmpLib::color(pixIte != colorList.cend() ? 255 : 0, 0, 0);
+					if (pixIte != colorList.cend())//ちゃんと色があれば
+						myImage.data[myImage.height - 1 - y][x] = bmpLib::color(pixIte->second.x(), 0, 5);//そもそもレイが放たれている範囲をうっすら色付け
+					else
+						myImage.data[myImage.height - 1 - y][x] = bmpLib::color(0, 0, 0);
 				}
 			}
 			bmpLib::WriteBmp((rezpath+branchpath+"final.bmp").c_str(), &myImage);
