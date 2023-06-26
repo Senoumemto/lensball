@@ -74,12 +74,12 @@ namespace developperParams {
 	const std::string framePath = R"(C:\local\user\lensball\lensball\resultsX\projectorFramesX768\)";
 	const std::string dicHeaderPath = R"(C:\local\user\lensball\lensball\resultsX\dicX768\projRefRayMap.head)";//辞書ヘッダが収まっている場所
 	constexpr ureal nodelensExpand = 1. + 1.e-4;//ノードレンズのギリギリに入射したときに判定できるようにする拡大率
-	constexpr size_t devThreadNum = 16;//現像をどれだけのスレッドで実行するか
+	constexpr size_t devThreadNum = 1;//現像をどれだけのスレッドで実行するか
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 3. / 180. * pi;
 	const uvec3 cameraPos(uvec3(30, 0., 0.));//カメラ位置
-	constexpr size_t cameraResW = 128, cameraResH = 128;
+	constexpr size_t cameraResW = 1, cameraResH = 1;
 };
 //スキャン時のパラメータ
 namespace scanParams {
@@ -136,46 +136,6 @@ uvec3 ExtendUvec2(const uvec2& v, const ureal& z) {
 //arrowをvec6に変える
 uvec6 ArrowToUVec6(const arrow<3>& v) {
 	return uvec6(v.org().x(), v.org().y(), v.org().z(), v.dir().x(), v.dir().y(), v.dir().z());
-}
-
-
-//プロジェクター辞書をデコードする
-void DeserializeProjRefraDic(const std::string& path) {
-	//ヘッダをロードする
-	projRefraDicHeader header;
-	{
-		ifstream ifs(path + ".head", std::ios::binary);
-		cereal::BinaryInputArchive iarch(ifs);
-
-		iarch(header);
-
-		std::cout << "Loaded header\nh: " << header.horizontalRes << "\nv: " << header.verticalRes << "\nt: " << header.rotationRes << endl;
-	}
-
-
-	//プロジェクターの色を計算することができるよ　各フレームごとに
-	for (size_t sd = 0; sd < header.rotationRes; sd++) {
-		//シーンのレイリストを計算する
-		std::list<arrow3> raylist;
-		{
-			ifstream ifs(path + ".part" + to_string(sd), std::ios::binary);
-			if (!ifs)throw std::runtime_error("ファイルを読めない");
-
-			cereal::BinaryInputArchive iarch(ifs);
-			iarch(raylist);
-		}
-
-		//これをたどればOK
-		auto listite = raylist.cbegin();
-		for(size_t hd=0;hd<header.horizontalRes;hd++,listite++)
-			for (size_t vd = 0; vd < header.verticalRes; vd++) {
-				const arrow3 refraction = (*listite);//このピクセルに対応するレイ
-
-
-
-			}
-
-	}
 }
 
 //角度を正規化する
@@ -519,22 +479,23 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			//カメラを生成
 			std::list<arrow3>cameraRayList;
-			for (size_t y = 0; y < developperParams::cameraResH; y++) {
-				const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
-				for (size_t x = 0; x < developperParams::cameraResW; x++) {
-					//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
+			cameraRayList.push_back(arrow3(uvec3::Zero(), uvec3(-1, 0, 0)));
+			//for (size_t y = 0; y < developperParams::cameraResH; y++) {
+			//	const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
+			//	for (size_t x = 0; x < developperParams::cameraResW; x++) {
+			//		//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
 
-					const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
-					double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
+			//		const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
+			//		double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
 
-					//orgが0 wayがスクリーンの正規化
-					Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scy, scx).normalized();
+			//		//orgが0 wayがスクリーンの正規化
+			//		Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scy, scx).normalized();
 
-					cameraRayList.push_back(arrow3(developperParams::cameraPos, scnormed));
-					//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraPos.x(), cameraPos.y(), cameraPos.z(), scnormed.x(), scnormed.y(), scnormed.z());
+			//		cameraRayList.push_back(arrow3(developperParams::cameraPos, scnormed));
+			//		//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraPos.x(), cameraPos.y(), cameraPos.z(), scnormed.x(), scnormed.y(), scnormed.z());
 
-				}
-			}
+			//	}
+			//}
 
 
 			//解像度とかがわかる
@@ -577,25 +538,27 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 								if (!apertureT.isHit) {
 									//プロジェクタには入社しなかった
 									if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
-									return std::optional<uvec3>();//このシーンではだめだったので次のレイ
+									return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
 								}
 
 								//開口にあたったらレイの向きで画素を判断できる
 								const uvec3 refractedDirInGlobal = GlobalToBallLocal.untiprograte() * refractedRay.value().dir();
-								
+
 								const auto pixpos = GetPixPosFromEnteredRay(refractedDirInGlobal);
 
 								//無効な座標でなければリストに入れる
 								if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
 									const auto pixColor = thisFrame.get()->data.at(pixpos.y()).at(pixpos.x());//フレームから色を取り出す
+									//cout << pixpos << "\n\n" << endl;
 									return std::optional<uvec3>(uvec3(pixColor.r, pixColor.g, pixColor.b));
 								}
 							}
 						}
+						
 					}
-					else {
-						return std::optional<uvec3>();//レンズボールに当たらなかったらあんま意味ない 次のレイに行く
-					}
+
+					//結果が特に挿入されることがなければ
+					return (std::optional<uvec3>)(std::nullopt);
 				};
 
 				//カメラの色をフレームから読み出す
@@ -604,18 +567,20 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					for (size_t camX = 0; camX < developperParams::cameraResW; camX++,cameraRayIte++){
 						const auto poskey = ivec2(camX, camY);//今のカメラ画素位置
 						//色をゲットする
-						const auto thiscolor = GetColorOfCamPix(cameraRayIte, poskey);//スレッド実行開始
-							if (thiscolor) {
-								lock_guard guard(colorListMutex);
+						const optional<uvec3> thiscolor = GetColorOfCamPix(cameraRayIte, poskey);//スレッド実行開始
+						if (thiscolor) {
+							lock_guard guard(colorListMutex);
 
-								const auto pixIte = colorList.find(poskey);
-								if (pixIte == colorList.cend())colorList[poskey] = uvec3::Zero();
-								colorList[poskey] = thiscolor.value();//各シーンの色を足し合わせてやればいい
+							const auto pixIte = colorList.find(poskey);
+							if (pixIte == colorList.cend())colorList[poskey] = uvec3::Zero();
+							colorList[poskey] += thiscolor.value();//各シーンの色を足し合わせてやればいい
 
-								const auto sizIte = colorSiz.find(poskey);//何フレームでゲットできたかをゲット
-								if (sizIte == colorSiz.cend())colorSiz[poskey] = 0;
-								colorSiz[poskey]++;
+							const auto sizIte = colorSiz.find(poskey);//何フレームでゲットできたかをゲット
+							if (sizIte == colorSiz.cend())colorSiz[poskey] = 0;
+							colorSiz[poskey]++;
 						}
+						else
+							int a = 0;
 					}
 
 				*finflag = true;
