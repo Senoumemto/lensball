@@ -50,6 +50,7 @@ using uaffine3 = Eigen::Transform<ureal, 3, 2>;
 template<typename T>using sptr = std::shared_ptr<T>;
 template<typename T>using uptr = std::unique_ptr<T>;
 
+using ivec2 = Eigen::Vector2i;
 
 //“ñŸŒ³ˆê”Ê‰»À•W xÀ•W,yÀ•W thetap¨ 1
 using up2d = uvec4;
