@@ -417,3 +417,7 @@ void pythonRuntime::SendCommand(const std::string& command) {
 void pythonRuntime::s(const std::string& s) {
 	SendCommand(s);
 }
+
+
+
+

@@ -60,7 +60,7 @@ namespace lensballDesignParams {
 };
 
 namespace developperParams {
-	const sphereParam apertureProjector(uvec3::Zero(), lensballDesignParams::sphereRadius / 60.);//ここにあたったらプロジェクターから出たってこと
+	const sphereParam apertureProjector(uvec3::Zero(), lensballDesignParams::sphereRadius / 80.);//ここにあたったらプロジェクターから出たってこと
 	const auto regularHexagon = [&] {
 		auto hexvjunk = MakeHexagon(sqrt(3.) / 2.);//六角形の頂点
 		hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
@@ -79,7 +79,7 @@ namespace developperParams {
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 3. / 180. * pi;
 	const uvec3 cameraPos(uvec3(30, 0., 0.));//カメラ位置
-	constexpr size_t cameraResW = 256, cameraResH = 256;
+	constexpr size_t cameraResW = 128, cameraResH = 128;
 };
 
 //ある半直線(ray)と線分(line)の当たり判定
@@ -120,46 +120,6 @@ bool NaihouHanteiX(const uvec2& p, const std::list<uvec2>& vs) {
 	return xcount % 2 && ycount % 2;
 }
 
-//球とarrowが交差するか判定する
-std::optional<ureal> IntersectSphereAndArrow(const sphereParam& s, const arrow3& r) {
-	//二次方程式の係数たち　ただし球ローカル
-	const ureal a = [&] {
-		ureal ret = 0.;
-		for (size_t i = 0; i < 3; i++)
-			ret += pow(r.dir()[i], 2);
-
-		return ret;
-	}();
-	const ureal b = [&] {
-		ureal ret = 0.;
-		for (size_t i = 0; i < 3; i++)
-			ret += r.dir()[i] * (r.org()[i] - s.first[i]);
-		return ret * 2.;
-	}();
-	const ureal c = [&] {
-		ureal ret = 0.;
-		for (size_t i = 0; i < 3; i++)
-			ret += pow(r.org()[i] - s.first[i], 2);
-		return ret - pow(s.second, 2);
-	}();
-
-	//解の公式を解けばok
-	const auto hanbetu = pow(b, 2) - 4. * a * c;
-	if (hanbetu < 0.)return std::nullopt;
-
-	const auto ans0 = (-b + sqrt(hanbetu)) / (2. * a);
-	const auto ans1 = (-b - sqrt(hanbetu)) / (2. * a);
-
-	//両方正なら
-	if (ans1 > 0. && ans0 > 0.)return std::min(ans0, ans1);
-
-	//球の中が始点なら一方が過去である
-	if (ans0 <= 0. && ans1 > 0.)return ans1;
-	else if (ans1 <= 0. && ans0 > 0.)return ans0;
-
-	//球の表面をかすめるならどっちでも一緒
-	return ans0;
-}
 
 //2dベクトルに要素を加える
 uvec3 ExtendUvec2(const uvec2& v, const ureal& z) {
@@ -240,6 +200,12 @@ size_t GetBisideIndex(size_t lini,size_t center, int way,const size_t indSiz) {
 	return NormalizeIntger<signed int>(signedIndex, indSiz);
 }
 
+ureal GetLatitudeInMapDFromRowIndex(size_t row) {
+	return lensballDesignParams::eachRowsDistance * row - (lensballDesignParams::eachRowsDistance * (ureal)(lensballDesignParams::rowNum - 1) / 2.);
+}
+ureal GetLongitudeInMapDFromLensIndexAndRowFlag(size_t lensIdInARow, bool isOddRow) {
+	return uleap(PairMinusPlus(lensballDesignParams::rowLength / 2.), lensIdInARow / (ureal)lensballDesignParams::lensNumInARow) + (isOddRow ? ((lensballDesignParams::rowLength) / (ureal)lensballDesignParams::lensNumInARow / 2.) : 0.);
+}
 //要素レンズを検索する
 optional<std::pair<sphereParam, uvec3>> SearchNodeLensHitByARayInBalllocal(const arrow3& targetInBalllocal, const resultIntersecteSphere& hitRezVsSphere,const std::unordered_map<std::pair<size_t, size_t>, sphereParam, HashPair>& nodelensParamsInBalllocal,const size_t searchAreaInARow, const size_t searchAreaInALen) {
 
@@ -253,9 +219,9 @@ optional<std::pair<sphereParam, uvec3>> SearchNodeLensHitByARayInBalllocal(const
 
 	//行に当たりをつける
 	const ureal regRayDirLati = [&] {
-		const ureal zerothRowlati = -(lensballDesignParams::eachRowsDistance * (ureal)(lensballDesignParams::rowNum - 1) / 2.);//zero番目の行の高さ
+		const ureal zerothRowlati = GetLatitudeInMapDFromRowIndex(0);//zero番目の行の高さ
 		const ureal zeroSetRayDir = hitposVsSphereInMapDesigned.y() - zerothRowlati;//0番目の行の高さに始点を合わせたレイの高さ
-		const ureal finalRowlati = (lensballDesignParams::eachRowsDistance * (ureal)(lensballDesignParams::rowNum - 1) / 2.);//rowNum-1番目の行の高さ
+		const ureal finalRowlati = GetLatitudeInMapDFromRowIndex(lensballDesignParams::rowNum - 1);//rowNum-1番目の行の高さ
 		//スケーリング　fin~0までのスケールがrowNum-1~0までのスケールになって欲しい
 		const ureal thisscale = (ureal)(lensballDesignParams::rowNum - 1 - 0) / (finalRowlati - zerothRowlati);
 
@@ -277,9 +243,9 @@ optional<std::pair<sphereParam, uvec3>> SearchNodeLensHitByARayInBalllocal(const
 		const ureal regRayDirLonn = [&] {
 			//const ureal tlonn = uleap(PairMinusPlus(rowLength/2.), ld / (ureal)lensNumInCollum) + (eachFlag ? ((rowLength) / (ureal)lensNumInCollum / 2.) : 0.);
 
-			const ureal zerothlenslonn = -lensballDesignParams::rowLength / 2.;//-rowLength/2.が最初のレンズの位置　場合によって前後するけどね
+			const ureal zerothlenslonn = GetLongitudeInMapDFromLensIndexAndRowFlag(0, rid % 2);//-rowLength/2.が最初のレンズの位置　場合によって前後するけどね
 			const ureal zeroSetRayDir = hitposVsSphereInMapDesigned.x() - zerothlenslonn;//zero番目のレンズの場所をzeroに
-			const ureal finlenslonn = uleap(PairMinusPlus(lensballDesignParams::rowLength / 2.), (lensballDesignParams::lensNumInARow - 1) / (ureal)lensballDesignParams::lensNumInARow);//最後のレンズの場所
+			const ureal finlenslonn = GetLongitudeInMapDFromLensIndexAndRowFlag(lensballDesignParams::lensNumInARow - 1, rid % 2);//最後のレンズの場所
 			//スケーリング　fin~0までのスケールがlensNumInCollum-1~0までのスケールになって欲しい
 			const ureal thisscale = (ureal)(lensballDesignParams::lensNumInARow - 1 - 0) / (finlenslonn - zerothlenslonn);
 
@@ -345,6 +311,37 @@ std::optional<arrow3> GetRefractedRayWithASphericalLens(const arrow3& targetInBa
 	return std::optional<arrow3>(refractedArrow);
 }
 
+//カメラ映像を保存する
+void WriteBmpOfCamera(const std::unordered_map<Eigen::Vector2i, uvec3>& colorList,const std::unordered_map<Eigen::Vector2i, size_t>& colorSiz) {
+	bmpLib::img picture;//カメラからの映像
+	picture.width = developperParams::cameraResW;
+	picture.data.resize(developperParams::cameraResH);
+	picture.height = developperParams::cameraResH;
+	bmpLib::img maskPic;//どこに値が存在するか
+	maskPic.width = developperParams::cameraResW;
+	maskPic.data.resize(developperParams::cameraResH);
+	maskPic.height = developperParams::cameraResH;
+	for (int y = 0; y < picture.height; y++) {
+		picture.data.at(picture.height - 1 - y).resize(developperParams::cameraResW);
+		maskPic.data.at(picture.height - 1 - y).resize(developperParams::cameraResW);
+		for (int x = 0; x < picture.width; x++) {
+			const auto pixIte = colorList.find(Eigen::Vector2i(x, y));
+			const auto sizeIte = colorSiz.find(Eigen::Vector2i(x, y));//対応したピクセルを設置
+			if (pixIte != colorList.cend()) {//ちゃんと色があれば
+				picture.data[picture.height - 1 - y][x] = bmpLib::color(pixIte->second.x(), 0, 0);//そもそもレイが放たれている範囲をうっすら色付け
+				maskPic.data[picture.height - 1 - y][x] = bmpLib::color(0, clamp<int>(sizeIte->second * 50, 0, 255), 0);
+			}
+			else {
+				picture.data[picture.height - 1 - y][x] = bmpLib::color(0, 0, 0);
+				maskPic.data[picture.height - 1 - y][x] = bmpLib::color(0, 0, 0);
+			}
+		}
+	}
+	bmpLib::WriteBmp((rezpath + branchpath + "pic.bmp").c_str(), &picture);
+	bmpLib::WriteBmp((rezpath + branchpath + "mask.bmp").c_str(), &maskPic);
+}
+
+
 int main() {
 
 	try {
@@ -409,7 +406,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			//std::list<uleap>//マップ座標でのレンズ中心
 			for (std::decay<decltype(lensballDesignParams::rowNum)>::type rd = 0; rd < lensballDesignParams::rowNum; rd++) {
-				const ureal tlati = lensballDesignParams::eachRowsDistance * rd - (lensballDesignParams::eachRowsDistance * (ureal)(lensballDesignParams::rowNum - 1) / 2.);//lati方向の現在位置
+				const ureal tlati = GetLatitudeInMapDFromRowIndex(rd);//lati方向の現在位置
 				const bool eachFlag = rd % 2;//交互に切り替わるフラグ
 				for (std::decay<decltype(lensballDesignParams::lensNumInARow)>::type ld = 0; ld < lensballDesignParams::lensNumInARow; ld++) {
 
@@ -418,7 +415,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					ResetPyVecSeries(pypltSeries);
 
 					//lonn方向の現在位置
-					const ureal tlonn = uleap(PairMinusPlus(lensballDesignParams::rowLength / 2.), ld / (ureal)lensballDesignParams::lensNumInARow) + (eachFlag ? ((lensballDesignParams::rowLength) / (ureal)lensballDesignParams::lensNumInARow / 2.) : 0.);
+					const ureal tlonn = GetLongitudeInMapDFromLensIndexAndRowFlag(ld, eachFlag);
 					const auto localcenterInMapDesigned = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
 					const auto localcenterInMap = lensballDesignParams::DesignedMapToMap.prograte() * localcenterInMapDesigned;
 					const auto localcenterInBalllocalPolar = MapToLocalPolar(localcenterInMap);
@@ -428,35 +425,37 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 					nodelensParamsRez[make_pair(rd, ld)] = sphereParam(localcenterInBalllocal, 1.1* lensballDesignParams::nodeLensRadius*fabs(cos(localcenterInBalllocalPolar.y())));
 
 					//要素レンズを描画していく
-					
-					//つぎに極座標で要素レンズを計算する
-					ResetPyVecSeries(nlensSeries);//ノードレンズ
-					for (std::decay<decltype(lensballDesignParams::nodeLensResolution.second)>::type nlla = 0; nlla < lensballDesignParams::nodeLensResolution.second; nlla++) {
+					if (drawNodelenses || drawNodelensEdges) {
 
-						ResetPyVecSeries(mlabSeries);//mlabSeriesはグリッドの一行を格納する
-						for (std::decay<decltype(lensballDesignParams::nodeLensResolution.first)>::type nllo = 0; nllo < lensballDesignParams::nodeLensResolution.first; nllo++) {
-							const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(lensballDesignParams::nodeLensResolution.first - 1)),
-								uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(lensballDesignParams::nodeLensResolution.second - 1)));//要素レンズローカルでの極座標
+						//つぎに極座標で要素レンズを計算する
+						ResetPyVecSeries(nlensSeries);//ノードレンズ
+						for (std::decay<decltype(lensballDesignParams::nodeLensResolution.second)>::type nlla = 0; nlla < lensballDesignParams::nodeLensResolution.second; nlla++) {
 
-							const uvec3 nodelensShape = (lensballDesignParams::nodeLensRadius * fabs(cos(localcenterInBalllocalPolar.y()))) * PolarToXyz(localpos);//これが球になるはず
-							AppendPyVecSeries(mlabSeries, nodelensShape + localcenterInBalllocal);
+							ResetPyVecSeries(mlabSeries);//mlabSeriesはグリッドの一行を格納する
+							for (std::decay<decltype(lensballDesignParams::nodeLensResolution.first)>::type nllo = 0; nllo < lensballDesignParams::nodeLensResolution.first; nllo++) {
+								const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(lensballDesignParams::nodeLensResolution.first - 1)),
+									uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(lensballDesignParams::nodeLensResolution.second - 1)));//要素レンズローカルでの極座標
+
+								const uvec3 nodelensShape = (lensballDesignParams::nodeLensRadius * fabs(cos(localcenterInBalllocalPolar.y()))) * PolarToXyz(localpos);//これが球になるはず
+								AppendPyVecSeries(mlabSeries, nodelensShape + localcenterInBalllocal);
+							}
+							if (drawNodelenses)py::s("nlx.append(mlabvx)\nnly.append(mlabvy)\nnlz.append(mlabvz)\n");//これでメッシュになると思うんやけど
 						}
-						if (drawNodelenses)py::s("nlx.append(mlabvx)\nnly.append(mlabvy)\nnlz.append(mlabvz)\n");//これでメッシュになると思うんやけど
-					}
 
-					if (drawNodelenses)py::sf("mlab.mesh(%s,color=(%f,%f,%f))", GetPySeriesForPlot(nlensSeries), color[0], color[1], color[2]);
-					//頂点を転送して描く
-					ResetPyVecSeries(mlabSeries);
-					for (const auto& v : lensballDesignParams::hexverticesNodelensOuter) {
-						const uvec2 designedVertex = (v + localcenterInMapDesigned);
-						const uvec2 vertex = lensballDesignParams::DesignedMapToMap.prograte() * designedVertex;//傾けてマップ座標にする
-						AppendPyVecSeries(pypltSeries, designedVertex);
-						const auto polarpos = MapToLocalPolar(vertex);//つぎに極座標を得る
-						AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
-					}
+						if (drawNodelenses)py::sf("mlab.mesh(%s,color=(%f,%f,%f))", GetPySeriesForPlot(nlensSeries), color[0], color[1], color[2]);
+						//頂点を転送して描く
+						ResetPyVecSeries(mlabSeries);
+						for (const auto& v : lensballDesignParams::hexverticesNodelensOuter) {
+							const uvec2 designedVertex = (v + localcenterInMapDesigned);
+							const uvec2 vertex = lensballDesignParams::DesignedMapToMap.prograte() * designedVertex;//傾けてマップ座標にする
+							AppendPyVecSeries(pypltSeries, designedVertex);
+							const auto polarpos = MapToLocalPolar(vertex);//つぎに極座標を得る
+							AppendPyVecSeries(mlabSeries, PolarToXyz(polarpos));
+						}
 
-					if (drawNodelensEdges)py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
-					if (drawNodelensEdges)py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
+						if (drawNodelensEdges)py::sf("plt.plot(%s,color=(%f,%f,%f))", GetPySeriesForPlot(pypltSeries), color[0], color[1], color[2]);
+						if (drawNodelensEdges)py::sf("mlab.plot3d(%s,color=(%f,%f,%f),tube_radius=0.01)", GetPySeriesForPlot(mlabSeries), color[0], color[1], color[2]);
+					}
 				}
 			}
 		};
@@ -504,8 +503,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			//解像度とかがわかる
 			//つぎに視点ごとにレイトレースしてどの画素に当たるか調べたい
 			std::mutex colorListMutex;
-			std::unordered_map<Eigen::Vector2i, uvec3> colorList;
-			std::unordered_map<Eigen::Vector2i, size_t> colorSiz;
+			std::unordered_map<Eigen::Vector2i, uvec3> colorList;//カメラの受光素子ごとの色の合計
+			std::unordered_map<Eigen::Vector2i, size_t> colorSiz;//受光素子に何シーン光が入射したか
 
 			//シーンの中でマルチスレッド化する
 			std::array<uptr<std::thread>, developperParams::devThreadNum> devThreads;
@@ -537,8 +536,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 							if (refractedRay) {
 								//つぎにプロジェクターのどの画素に当たるかを解く
 								//まず開口に当たるかい
-								auto apertureT = IntersectSphereAndArrow(developperParams::apertureProjector, refractedRay.value());
-								if (!apertureT) {
+								auto apertureT = IntersectSphere(refractedRay.value(), developperParams::apertureProjector.first, developperParams::apertureProjector.second);
+								if (!apertureT.isHit) {
 									//プロジェクタには入社しなかった
 									if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
 									return std::optional<uvec3>();//このシーンではだめだったので次のレイ
@@ -620,30 +619,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 				}
 			}
 
-
-			//とりあえず映像が見えるゾーンをマッピング
-			bmpLib::img myImage;
-			myImage.width = developperParams::cameraResW;
-			myImage.data.resize(developperParams::cameraResH);
-			myImage.height = developperParams::cameraResH;
-			for (int y = 0; y < myImage.height; y++) {
-				myImage.data.at(myImage.height - 1 - y).resize(developperParams::cameraResW);
-				for (int x = 0; x < myImage.width; x++) {
-					const auto pixIte = colorList.find(Eigen::Vector2i(x, y));
-					const auto sizeIte = colorSiz.find(Eigen::Vector2i(x, y));//対応したピクセルを設置
-					if (pixIte != colorList.cend()) {//ちゃんと色があれば
-						myImage.data[myImage.height - 1 - y][x] = bmpLib::color(pixIte->second.x(), 0, 0);//そもそもレイが放たれている範囲をうっすら色付け
-						cout << x << "\t" << y << "\t" << sizeIte->second << endl;//サイズを表示する
-					}
-					else
-						myImage.data[myImage.height - 1 - y][x] = bmpLib::color(0, 0, 0);
-				}
-			}
-			bmpLib::WriteBmp((rezpath+branchpath+"final.bmp").c_str(), &myImage);
-
+			//映像をBMPとして書き出す
+			WriteBmpOfCamera(colorList, colorSiz);
 		}
-
-
 
 
 
@@ -842,7 +820,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 		//表示する 3d 2dの順
 		//py::s("mlab.show()");
-		py::s("plt.show()");
+		//py::s("plt.show()");
 
 		const auto endTimePoint = std::chrono::system_clock::now();
 		std::cout << "Finish: " << endTimePoint << endl;
