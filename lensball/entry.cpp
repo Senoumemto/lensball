@@ -60,7 +60,7 @@ namespace lensballDesignParams {
 };
 //現像時のパラメータ
 namespace developperParams {
-	const sphereParam apertureProjector(uvec3::Zero(), lensballDesignParams::sphereRadius / 40.);//ここにあたったらプロジェクターから出たってこと
+	const ureal apertureRadius = lensballDesignParams::sphereRadius / 40.;//ここにあたったらプロジェクターから出たってこと
 	const auto regularHexagon = [&] {
 		auto hexvjunk = MakeHexagon(sqrt(3.) / 2.);//六角形の頂点
 		hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
@@ -73,13 +73,16 @@ namespace developperParams {
 	//まずヘッダを読み出す
 	const std::string framePath = R"(C:\local\user\lensball\lensball\resultsX\projectorFramesX768\)";
 	const std::string dicHeaderPath = R"(C:\local\user\lensball\lensball\resultsX\dicX768\projRefRayMap.head)";//辞書ヘッダが収まっている場所
+
 	constexpr ureal nodelensExpand = 1. + 1.e-4;//ノードレンズのギリギリに入射したときに判定できるようにする拡大率
-	constexpr size_t devThreadNum = 1;//現像をどれだけのスレッドで実行するか
+	constexpr size_t devThreadNum = 18;//現像をどれだけのスレッドで実行するか
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 3. / 180. * pi;
 	const uvec3 cameraPos(uvec3(30, 0., 0.));//カメラ位置
-	constexpr size_t cameraResW = 1, cameraResH = 1;
+	constexpr size_t cameraResW = 64, cameraResH = 64;
+
+	constexpr size_t subStepRes=10;//より細かくボールを回す
 };
 //スキャン時のパラメータ
 namespace scanParams {
@@ -309,7 +312,7 @@ std::optional<arrow3> GetRefractedRayWithASphericalLens(const arrow3& targetInBa
 }
 
 //カメラ映像を保存する
-void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList,const std::unordered_map<ivec2, size_t>& colorSiz) {
+void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList, const std::unordered_map < ivec2, ureal > & colorSiz) {
 	bmpLib::img picture;//カメラからの映像
 	picture.width = developperParams::cameraResW;
 	picture.data.resize(developperParams::cameraResH);
@@ -326,7 +329,7 @@ void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList,const st
 			const auto sizeIte = colorSiz.find(ivec2(x, y));//対応したピクセルを設置
 			if (pixIte != colorList.cend()) {//ちゃんと色があれば
 				picture.data[picture.height - 1 - y][x] = bmpLib::color(pixIte->second.x(), pixIte->second.y(), pixIte->second.z());//そもそもレイが放たれている範囲をうっすら色付け
-				maskPic.data[picture.height - 1 - y][x] = bmpLib::color(0, clamp<int>(sizeIte->second * 50, 0, 255), 0);
+				maskPic.data[picture.height - 1 - y][x] = bmpLib::color(0, clamp<int>(sizeIte->second, 0, 255), 0);
 			}
 			else {
 				picture.data[picture.height - 1 - y][x] = bmpLib::color(0, 0, 0);
@@ -338,6 +341,15 @@ void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList,const st
 	bmpLib::WriteBmp((rezpath + branchpath + "mask.bmp").c_str(), &maskPic);
 }
 
+//アパーチャ
+bool ThroughAperture(const arrow3& global) {
+	if (fabs(global.dir().x())<=0.0001)throw runtime_error("zero div");
+	const ureal t = -global.org().x() / global.dir().x();//x=0との好転を求める
+	const uvec3 hitpos = global.dir() * t + global.org();
+
+	//このノルムが半径未満なら
+	return hitpos.norm() <= developperParams::apertureRadius;
+}
 
 int main() {
 
@@ -479,42 +491,42 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			//カメラを生成
 			std::list<arrow3>cameraRayList;
-			cameraRayList.push_back(arrow3(uvec3::Zero(), uvec3(-1, 0, 0)));
-			//for (size_t y = 0; y < developperParams::cameraResH; y++) {
-			//	const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
-			//	for (size_t x = 0; x < developperParams::cameraResW; x++) {
-			//		//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
+			//cameraRayList.push_back(arrow3(uvec3::Zero(), uvec3(-1, 0, 0)));
+			for (size_t y = 0; y < developperParams::cameraResH; y++) {
+				const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
+				for (size_t x = 0; x < developperParams::cameraResW; x++) {
+					//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
 
-			//		const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
-			//		double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
+					const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
+					double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
 
-			//		//orgが0 wayがスクリーンの正規化
-			//		Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scy, scx).normalized();
+					//orgが0 wayがスクリーンの正規化
+					Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scy, scx).normalized();
 
-			//		cameraRayList.push_back(arrow3(developperParams::cameraPos, scnormed));
-			//		//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraPos.x(), cameraPos.y(), cameraPos.z(), scnormed.x(), scnormed.y(), scnormed.z());
+					cameraRayList.push_back(arrow3(developperParams::cameraPos, scnormed));
+					//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraPos.x(), cameraPos.y(), cameraPos.z(), scnormed.x(), scnormed.y(), scnormed.z());
 
-			//	}
-			//}
+				}
+			}
 
 
 			//解像度とかがわかる
 			//つぎに視点ごとにレイトレースしてどの画素に当たるか調べたい
 			std::mutex colorListMutex;
 			std::unordered_map<ivec2, uvec3> colorList;//カメラの受光素子ごとの色の合計
-			std::unordered_map<ivec2, size_t> colorSiz;//受光素子に何シーン光が入射したか
+			std::unordered_map<ivec2, ureal> colorSiz;//受光素子に何シーン光が入射したか
 
 			//シーンの中でマルチスレッド化する
 			std::array<uptr<std::thread>, developperParams::devThreadNum> devThreads;
 			std::array<bool, developperParams::devThreadNum> finFlagOfEachDevThread;//スキャンがおわったことを報告
 			//あるシーンでのカメラ映像をけいさんする
-			const auto GetAFrameOfAScene = [&](const size_t rd,const decltype(finFlagOfEachDevThread)::iterator finflag) {
+			const auto GetAFrameOfAScene = [&](const size_t rdx,const decltype(finFlagOfEachDevThread)::iterator finflag) {
 				////まずはフレームを読み出す
 				const auto thisFrame = make_unique<bmpLib::img>();
-				bmpLib::ReadBmp((developperParams::framePath + "frame" + to_string(rd) + ".bmp").c_str(), thisFrame.get());
+				bmpLib::ReadBmp((developperParams::framePath + "frame" + to_string(rdx/developperParams::subStepRes) + ".bmp").c_str(), thisFrame.get());
 				
 				//つぎにローカルグローバル変換を計算する
-				const ureal ballRotation = uleap(PairMinusPlus(pi), rd / (ureal)(header.rotationRes)) + (2. * pi / (ureal)(header.rotationRes + 1) / 2.);//ボールの回転角度
+				const ureal ballRotation = uleap(PairMinusPlus(pi), rdx / (ureal)(header.rotationRes* developperParams::subStepRes)) + (2. * pi / (ureal)(header.rotationRes + 1) / 2.);//ボールの回転角度
 				const bitrans<Eigen::AngleAxis<ureal>> GlobalToBallLocal(Eigen::AngleAxis<ureal>(-ballRotation, uvec3::UnitZ()));//グローバルからレンズボールローカルへの変換 XYZ座標
 
 				//あるレイが当たるピクセルの色を求める
@@ -532,25 +544,26 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 							//屈折
 							const auto refractedRay = GetRefractedRayWithASphericalLens(targetInBalllocal, hitlensParamInBalllocal.value(), printMessagesInDevelopping);
 							if (refractedRay) {
+								const arrow3 refractedArrowInGlobal(GlobalToBallLocal.untiprograte()* refractedRay.value().org(), GlobalToBallLocal.untiprograte()* refractedRay.value().dir());//レイの向きを戻す
 								//つぎにプロジェクターのどの画素に当たるかを解く
 								//まず開口に当たるかい
-								auto apertureT = IntersectSphere(refractedRay.value(), developperParams::apertureProjector.first, developperParams::apertureProjector.second);
-								if (!apertureT.isHit) {
+								if (!ThroughAperture(refractedArrowInGlobal)) {
 									//プロジェクタには入社しなかった
 									if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
 									return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
 								}
 
 								//開口にあたったらレイの向きで画素を判断できる
-								const uvec3 refractedDirInGlobal = GlobalToBallLocal.untiprograte() * refractedRay.value().dir();
-
-								const auto pixpos = GetPixPosFromEnteredRay(refractedDirInGlobal);
+								const auto pixpos = GetPixPosFromEnteredRay(refractedArrowInGlobal.dir());
 
 								//無効な座標でなければリストに入れる
 								if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
 									const auto pixColor = thisFrame.get()->data.at(pixpos.y()).at(pixpos.x());//フレームから色を取り出す
 									//cout << pixpos << "\n\n" << endl;
 									return std::optional<uvec3>(uvec3(pixColor.r, pixColor.g, pixColor.b));
+								}
+								else {
+									cout << pixpos << "\n\n" << endl;
 								}
 							}
 						}
@@ -577,7 +590,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 							const auto sizIte = colorSiz.find(poskey);//何フレームでゲットできたかをゲット
 							if (sizIte == colorSiz.cend())colorSiz[poskey] = 0;
-							colorSiz[poskey]++;
+							colorSiz[poskey] += 1.;
 						}
 						else
 							int a = 0;
@@ -596,7 +609,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						devThreads.at(th).reset(new std::thread(GetAFrameOfAScene, rd, finFlagOfEachDevThread.begin() + th));//処理をセットする
 						rd++;
 						//処理終わりです
-						if (rd >= header.rotationRes) {
+						if (rd >= header.rotationRes*developperParams::subStepRes) {
 							threadLoopFin = true;
 							break;
 						}
