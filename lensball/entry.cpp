@@ -80,7 +80,7 @@ namespace developperParams {
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 3. / 180. * pi;
 	const uvec3 cameraPos(uvec3(30, 0., 0.));//カメラ位置
-	constexpr size_t cameraResW = 64, cameraResH = 64;
+	constexpr size_t cameraResW = 768, cameraResH = 768;
 
 	constexpr size_t subStepRes=1;//より細かくボールを回す
 };
@@ -199,7 +199,7 @@ ivec2 GetPixPosFromEnteredRay(const uvec3& enteredDir) {
 	const ureal t = dist / enteredDir.x();
 	const uvec3 crosspos = enteredDir * t;//ここが表示面との交差
 
-	const uvec2 posInDisplay(crosspos.y(), crosspos.z());
+	const uvec2 posInDisplay(crosspos.y(), -crosspos.z());
 
 	//逆算をするとこういうこと
 	const uvec2 realpos = 0.5 * (posInDisplay + uvec2(1., 1.));
@@ -649,27 +649,27 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			//カメラを生成
 			std::list<arrow3>cameraRayList;
 			//cameraRayList.push_back(arrow3(uvec3::Zero(), uvec3(-1, 0, 0)));
-			for (size_t y = 0; y < developperParams::cameraResH; y++) {
-				const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
-				for (size_t x = 0; x < developperParams::cameraResW; x++) {
-					//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
+			//for (size_t y = 0; y < developperParams::cameraResH; y++) {
+			//	const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
+			//	for (size_t x = 0; x < developperParams::cameraResW; x++) {
+			//		//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
 
-					const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
-					double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
+			//		const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
+			//		double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
 
-					//orgが0 wayがスクリーンの正規化
-					Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scy, scx).normalized();
+			//		//orgが0 wayがスクリーンの正規化
+			//		Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scy, scx).normalized();
 
-					cameraRayList.push_back(arrow3(developperParams::cameraPos, scnormed));
-					//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().org().z(), cameraRayList.back().dir().x(), cameraRayList.back().dir().y(), cameraRayList.back().dir().z());
-					//py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],color=(1,0,0))", cameraRayList.back().org().x(), cameraRayList.back().dir().x()*30.+ cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().dir().y()*30.+ cameraRayList.back().org().y(),cameraRayList.back().org().z(), cameraRayList.back().dir().z()*30.+ cameraRayList.back().org().z());
+			//		cameraRayList.push_back(arrow3(developperParams::cameraPos, scnormed));
+			//		//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().org().z(), cameraRayList.back().dir().x(), cameraRayList.back().dir().y(), cameraRayList.back().dir().z());
+			//		//py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],color=(1,0,0))", cameraRayList.back().org().x(), cameraRayList.back().dir().x()*30.+ cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().dir().y()*30.+ cameraRayList.back().org().y(),cameraRayList.back().org().z(), cameraRayList.back().dir().z()*30.+ cameraRayList.back().org().z());
 
-				}
-			}
+			//	}
+			//}
 			//あるシーンでのフレームを読み出す
-			//std::list<arrow3> apart;
-			/* {
-				ifstream ifs(rezpath + branchpath + StringFormat("projRefRayMap.part%d",600),std::ios::binary);
+			std::list<arrow3> apart;
+			{
+				ifstream ifs(R"(C:\local\user\lensball\lensball\resultsX\dicX768\projRefRayMap.part0)",std::ios::binary);
 				cereal::BinaryInputArchive i_archive(ifs);
 				i_archive(apart);
 			}
@@ -677,7 +677,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 				const arrow3 dam = arrow3(a.org() + a.dir(), -a.dir());
 				cameraRayList.push_back(arrow3(a.org() + a.dir(), -a.dir()));
 				//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(0,1,0))", dam.org().x(), dam.org().y(), dam.org().z(), dam.dir().x(), dam.dir().y(), dam.dir().z());
-			}*/
+			}
 
 			//解像度とかがわかる
 			//つぎに視点ごとにレイトレースしてどの画素に当たるか調べたい
@@ -786,7 +786,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 						devThreads.at(th).reset(new std::thread(GetAFrameOfAScene, rd, finFlagOfEachDevThread.begin() + th));//処理をセットする
 						rd++;
 						//処理終わりです
-						if (rd >= header.rotationRes * developperParams::subStepRes) {
+						if (rd >= 0/*header.rotationRes * developperParams::subStepRes*/) {
 							threadLoopFin = true;
 							break;
 						}
