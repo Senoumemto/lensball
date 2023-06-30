@@ -273,5 +273,22 @@ struct HashPair {
 	}
 };
 
+//環境によって設定を変える
+struct appContext{
+	int version;//コンテキストファイルのバージョン　違うと怒られる
+	size_t threadNumMax;//マルチスレッドするときに使えるスレッド数の最大
+	std::string rezpath;//結果パス　ブランチパスの親になる
+	std::list<std::string> defaultArg;//デフォルト引数
 
+	//シリアライズできるように
+	template<class Archive> void serialize(Archive& archive) const {
+		archive(CEREAL_NVP(version), CEREAL_NVP(threadNumMax), CEREAL_NVP(rezpath), CEREAL_NVP(defaultArg));
+	}
+	template<class Archive> void serialize(Archive& archive) {
+		archive(CEREAL_NVP(version), CEREAL_NVP(threadNumMax), CEREAL_NVP(rezpath), CEREAL_NVP(defaultArg));
+	}
+
+	//テスト用に適当な内容のコンテキストを出力する
+	static void WriteDammyContext(const std::string appContextPath);
+};
 

@@ -6,7 +6,10 @@
 
 using namespace std;
 
-const std::string rezpath = "C:/local/user/lensball/lensball/rez/";//結果を格納するフォルダ
+const std::string appContextPath(R"(./lensball.context)");//コンテキスト置き場　かえないで
+constexpr size_t appContextVersion=1;//コンテキストのバージョン　内容が変わったらこれを更新してください
+
+std::string rezpath = "./";//結果を格納するフォルダ(コンテキストに支配されます)
 const std::string branchpath = "SimVis/";//このbranchの結果を格納するフォルダ
 
 using py = pythonRuntime;
@@ -71,12 +74,12 @@ namespace developperParams {
 	constexpr size_t searchAreaInARow = 5;//列をどれだけ深追いして検索するか
 	//あたりを付けたノードレンズから探索する範囲
 	//まずヘッダを読み出す
-	const std::string framePrefix = rezpath + branchpath + "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
-	const std::string dicHeaderPath = rezpath + branchpath + "dic\\dic.head";//辞書ヘッダのパス
+	const std::string framePrefixX = "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
+	const std::string dicHeaderPathX = "dic\\dic.head";//辞書ヘッダのパス
 	const std::string developRezPath = "dev";//branchフォルダ内のここに結果を保存する
 
 	constexpr ureal nodelensExpand = 1. + 1.e-4;//ノードレンズのギリギリに入射したときに判定できるようにする拡大率
-	constexpr size_t devThreadNum = 18;//現像をどれだけのスレッドで実行するか
+	size_t devThreadNum = 1;//現像をどれだけのスレッドで実行するか(コンテキストに支配されます)
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
@@ -84,12 +87,12 @@ namespace developperParams {
 
 	constexpr size_t subStepRes=10;//より細かくボールを回す
 
-	const auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(-30. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
+	const auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(15. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
 };
 //スキャン時のパラメータ
 namespace scanParams {
 	const ureal nodeLensFocalLength = lensballDesignParams::nodeLensRadius * 1.5;//要素レンズの中心から焦点までの距離
-	constexpr size_t scanThreadNum = 18;//スキャンに使うスレッド数
+	size_t scanThreadNum = 1;//スキャンに使うスレッド数(コンテキストに支配されます)
 	const std::string resultDicPrefix = "dic\\dic";
 	constexpr size_t searchAreaInALen = 5;//同じ行のレンズをどれだけ深追いして検索するか
 	constexpr size_t searchAreaInARow = 5;//列をどれだけ深追いして検索するか
@@ -390,7 +393,7 @@ ureal GetRotationAngleFromRd(const ureal rd) {
 	return uleap({ 0.,2. * pi }, rd / (ureal)(hardwareParams::numOfProjectionPerACycle));
 }
 
-int main() {
+int main(int argc, char* argv[]) {
 
 	try {
 		//開始時刻を記録してスタート
@@ -404,6 +407,31 @@ int main() {
 		const pyVecSeries<6> quiverSeries("mlabquiver");//ベクトル場用
 		const std::array<const string, 6> quiverPrefix = { "x","y","z","a","b","c" };
 
+		//コンテキストファイルを読み込んでデバイスに普遍的な処理をする
+		constexpr bool useContext = true;
+		std::list<std::string> appArgs;//アプリケーションの引数はここに格納される
+		if (useContext) {
+			appContext usercon;
+			{
+				ifstream ifs(appContextPath, std::ios::binary);
+
+				cereal::JSONInputArchive iarch(ifs);
+				iarch(usercon);
+			}
+
+			//コンテキストを適用する
+			rezpath = usercon.rezpath;
+			developperParams::devThreadNum = usercon.threadNumMax;
+			scanParams::scanThreadNum = usercon.threadNumMax;
+
+
+			//引数処理をする
+			if (argc) {//引数が与えられていれば
+				for (size_t ad = 0; ad < argc; ad++)
+					appArgs.push_back(std::string(argv[ad]));
+			}
+			else appArgs = usercon.defaultArg;
+		}
 
 		//Pythonをセットアップしてからレンズボールの概形を書く
 		constexpr bool drawSphere = true;//レンズボール概形を描画する
@@ -519,8 +547,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		if (scanLenses) {
 
 			//並列処理用のいろいろ
-			std::array<uptr<std::thread>, scanParams::scanThreadNum> scanThreads;//実行スレッド
-			std::array<bool, scanParams::scanThreadNum> finFlagOfEachScanThread;//スキャンがおわったことを報告
+			std::vector<uptr<std::thread>> scanThreads(scanParams::scanThreadNum);//実行スレッド
+			std::vector<bool> finFlagOfEachScanThread(scanParams::scanThreadNum);//スキャンがおわったことを報告
 
 			//格納結果の形式を示すヘッダを作って保存する
 			const projRefraDicHeader storageheader(hardwareParams::projectorResInPhi, hardwareParams::projectorResInTheta, hardwareParams::numOfProjectionPerACycle);
@@ -641,7 +669,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 		if (developImage) {
 			projRefraDicHeader header;
 			{
-				ifstream ifs(developperParams::dicHeaderPath, std::ios::binary);
+				ifstream ifs(rezpath + branchpath + developperParams::dicHeaderPathX, std::ios::binary);
 				cereal::BinaryInputArchive iarch(ifs);
 
 				iarch(header);
@@ -676,13 +704,13 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			std::unordered_map<ivec2, ureal> colorSiz;//受光素子に何シーン光が入射したか
 
 			//シーンの中でマルチスレッド化する
-			std::array<uptr<std::thread>, developperParams::devThreadNum> devThreads;
-			std::array<bool, developperParams::devThreadNum> finFlagOfEachDevThread;//スキャンがおわったことを報告
+			std::vector<uptr<std::thread>> devThreads(developperParams::devThreadNum);
+			std::vector<bool> finFlagOfEachDevThread(developperParams::devThreadNum);//スキャンがおわったことを報告
 			//あるシーンでのカメラ映像をけいさんする
 			const auto GetAFrameOfAScene = [&](const size_t rdx,const decltype(finFlagOfEachDevThread)::iterator finflag) {
 				////まずはフレームを読み出す
 				const auto thisFrame = make_unique<bmpLib::img>();
-				bmpLib::ReadBmp((developperParams::framePrefix + to_string(rdx / developperParams::subStepRes) + ".bmp").c_str(), thisFrame.get());
+				bmpLib::ReadBmp((rezpath + branchpath + developperParams::framePrefixX + to_string(rdx / developperParams::subStepRes) + ".bmp").c_str(), thisFrame.get());
 
 				//つぎにローカルグローバル変換を計算する
 				const ureal ballRotation = GetRotationAngleFromRd((ureal)rdx / (ureal)(developperParams::subStepRes));//ボールの回転角度

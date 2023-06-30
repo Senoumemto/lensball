@@ -421,3 +421,26 @@ void pythonRuntime::s(const std::string& s) {
 
 
 
+//テスト用に適当な内容のコンテキストを出力する
+void appContext::WriteDammyContext(const std::string appContextPath) {
+
+	//コンテキストを書き込みます
+	if (1) {
+		appContext usercon;
+		usercon.rezpath = R"(C:\local\user\lensball\lensball\rez\)";
+		usercon.threadNumMax = 18;
+		usercon.version = 1;
+		usercon.defaultArg.push_back("first");
+		usercon.defaultArg.push_back("second");
+		usercon.defaultArg.push_back("third");
+
+		{
+			ofstream ifs(appContextPath, std::ios::binary);
+
+			cereal::JSONOutputArchive iarch(ifs);
+			iarch(usercon);
+		}
+
+		exit(0);
+	}
+}
