@@ -71,19 +71,20 @@ namespace developperParams {
 	constexpr size_t searchAreaInARow = 5;//列をどれだけ深追いして検索するか
 	//あたりを付けたノードレンズから探索する範囲
 	//まずヘッダを読み出す
-	const std::string framePath = rezpath + branchpath + "frames\\";
-	const std::string dicHeaderPath = rezpath + branchpath + "dic\\dic.head";//辞書ヘッダが収まっている場所
-	const std::string developRezPath = "dev";
+	const std::string framePrefix = rezpath + branchpath + "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
+	const std::string dicHeaderPath = rezpath + branchpath + "dic\\dic.head";//辞書ヘッダのパス
+	const std::string developRezPath = "dev";//branchフォルダ内のここに結果を保存する
 
 	constexpr ureal nodelensExpand = 1. + 1.e-4;//ノードレンズのギリギリに入射したときに判定できるようにする拡大率
 	constexpr size_t devThreadNum = 18;//現像をどれだけのスレッドで実行するか
 
 	//現像に使うカメラ
-	constexpr ureal fovHalf = 3. / 180. * pi;
-	const uvec3 cameraPos(uvec3(30, 0., 0.));//カメラ位置
-	constexpr size_t cameraResW = 768, cameraResH = 768;
+	constexpr ureal fovHalf = 1.5 / 180. * pi;
+	constexpr size_t cameraResW = 256, cameraResH = 256;
 
-	constexpr size_t subStepRes=1;//より細かくボールを回す
+	constexpr size_t subStepRes=10;//より細かくボールを回す
+
+	const auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(-30. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
 };
 //スキャン時のパラメータ
 namespace scanParams {
@@ -651,33 +652,21 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			//カメラを生成
 			std::list<arrow3>cameraRayList;
 			//cameraRayList.push_back(arrow3(uvec3::Zero(), uvec3(-1, 0, 0)));
-			//for (size_t y = 0; y < developperParams::cameraResH; y++) {
-			//	const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
-			//	for (size_t x = 0; x < developperParams::cameraResW; x++) {
-			//		//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
+			for (size_t y = 0; y < developperParams::cameraResH; y++) {
+				const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
+				for (size_t x = 0; x < developperParams::cameraResW; x++) {
+					//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
 
-			//		const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
-			//		double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
+					const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
+					double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
 
-			//		//orgが0 wayがスクリーンの正規化
-			//		Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scy, scx).normalized();
+					//orgが0 wayがスクリーンの正規化
+					Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scx, scy).normalized();
 
-			//		cameraRayList.push_back(arrow3(developperParams::cameraPos, scnormed));
-			//		//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().org().z(), cameraRayList.back().dir().x(), cameraRayList.back().dir().y(), cameraRayList.back().dir().z());
-			//		//py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],color=(1,0,0))", cameraRayList.back().org().x(), cameraRayList.back().dir().x()*30.+ cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().dir().y()*30.+ cameraRayList.back().org().y(),cameraRayList.back().org().z(), cameraRayList.back().dir().z()*30.+ cameraRayList.back().org().z());
-
-			//	}
-			//}
-			//あるシーンでのフレームを読み出す とりあえずシーン0をデベロップする　シーン0の絵がそのまま出てくるはず
-			std::list<arrow3> apart;
-			{
-				ifstream ifs(rezpath+branchpath+scanParams::resultDicPrefix+".part600", std::ios::binary);
-				cereal::BinaryInputArchive i_archive(ifs);
-				i_archive(apart);
-			}
-			for (const auto& a : apart) {
-				cameraRayList.push_back(arrow3(a.org() + a.dir(), -a.dir()));
-				//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(0,1,0))", dam.org().x(), dam.org().y(), dam.org().z(), dam.dir().x(), dam.dir().y(), dam.dir().z());
+					cameraRayList.push_back(arrow3(developperParams::cameraToGlobal* uvec3(0., 0., 0.), developperParams::cameraToGlobal.rotation()* scnormed));
+					//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().org().z(), cameraRayList.back().dir().x(), cameraRayList.back().dir().y(), cameraRayList.back().dir().z());
+					//py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],color=(1,0,0))", cameraRayList.back().org().x(), cameraRayList.back().dir().x()*30.+ cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().dir().y()*30.+ cameraRayList.back().org().y(),cameraRayList.back().org().z(), cameraRayList.back().dir().z()*30.+ cameraRayList.back().org().z());
+				}
 			}
 
 			//解像度とかがわかる
@@ -693,7 +682,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 			const auto GetAFrameOfAScene = [&](const size_t rdx,const decltype(finFlagOfEachDevThread)::iterator finflag) {
 				////まずはフレームを読み出す
 				const auto thisFrame = make_unique<bmpLib::img>();
-				bmpLib::ReadBmp((developperParams::framePath + "frame" + to_string(rdx / developperParams::subStepRes) + ".bmp").c_str(), thisFrame.get());
+				bmpLib::ReadBmp((developperParams::framePrefix + to_string(rdx / developperParams::subStepRes) + ".bmp").c_str(), thisFrame.get());
 
 				//つぎにローカルグローバル変換を計算する
 				const ureal ballRotation = GetRotationAngleFromRd((ureal)rdx / (ureal)(developperParams::subStepRes));//ボールの回転角度
