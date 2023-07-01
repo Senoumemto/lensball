@@ -85,7 +85,7 @@ namespace developperParams {
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
 	constexpr size_t cameraResW = 1, cameraResH = 1;//あるレイに代表するからね
 
-	constexpr size_t subStepRes=10;//より細かくボールを回す
+	constexpr size_t subStepRes=100;//より細かくボールを回す
 
 	const auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(15. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
 };
@@ -393,6 +393,13 @@ ureal GetRotationAngleFromRd(const ureal rd) {
 	return uleap({ 0.,2. * pi }, rd / (ureal)(hardwareParams::numOfProjectionPerACycle));
 }
 
+//レイを棒で描画する
+void PlotRayInMlab(const arrow3& ray,const std::string& prefix="") {
+	const uvec3 from = ray.org();
+	uvec3 to = ray.dir() + ray.org();
+	py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],%s)",from.x(),to.x(), from.y(), to.y(), from.z(), to.z(),prefix);
+}
+
 int main(int argc, char* argv[]) {
 
 	try {
@@ -690,8 +697,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 			//なんか一本だけ作る
 			{
 				//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
-				const ureal scy = 0.2;
-				const ureal scx = 0.2;
+				const ureal scy = 0.4;
+				const ureal scx = 0.4;
 				double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
 				//orgが0 wayがスクリーンの正規化
 				Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scx, scy).normalized();
@@ -755,7 +762,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								//まず開口に当たるかい
 								if (!ThroughAperture(refractedArrowInGlobal)) {
 									//プロジェクタには入社しなかった
-									if(rdx%47==2)py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(0,0,1))", refractedArrowInGlobal.org().x(), refractedArrowInGlobal.org().y(), refractedArrowInGlobal.org().z(), refractedArrowInGlobal.dir().x(), refractedArrowInGlobal.dir().y(), refractedArrowInGlobal.dir().z());
+									if (rdx % (int)(developperParams::subStepRes*2.24) == 2)PlotRayInMlab(refractedArrowInGlobal,"color=(0,0,1), tube_radius=0.01");
 										
 									if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
 									return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
@@ -764,8 +771,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								//開口にあたったらレイの向きで画素を判断できる
 								const auto pixpos = GetPixPosFromEnteredRay(refractedArrowInGlobal.dir());
 								//アパーチャに入ったら違う色で描画してやる
-								py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(1,0,1))", refractedArrowInGlobal.org().x(), refractedArrowInGlobal.org().y(), refractedArrowInGlobal.org().z(), refractedArrowInGlobal.dir().x(), refractedArrowInGlobal.dir().y(), refractedArrowInGlobal.dir().z());
-
+								PlotRayInMlab(refractedArrowInGlobal, "color=(1,0,1), tube_radius=0.01");
 
 								//無効な座標でなければリストに入れる
 								if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
