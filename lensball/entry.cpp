@@ -83,7 +83,7 @@ namespace developperParams {
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
-	constexpr size_t cameraResW = 256, cameraResH = 256;
+	constexpr size_t cameraResW = 1, cameraResH = 1;//あるレイに代表するからね
 
 	constexpr size_t subStepRes=10;//より細かくボールを回す
 
@@ -435,6 +435,7 @@ int main(int argc, char* argv[]) {
 
 		//Pythonをセットアップしてからレンズボールの概形を書く
 		constexpr bool drawSphere = true;//レンズボール概形を描画する
+		constexpr bool drawAparture = true;//アパーチャを描画する
 		{
 
 			//pythonランタイムを準備していろいろ初期処理
@@ -456,11 +457,18 @@ int main(int argc, char* argv[]) {
 spx = np.cos(sphphi)*np.sin(sphtheta)
 spy = np.sin(sphphi)*np.sin(sphtheta)
 spz = np.cos(sphtheta)
-mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )  
+mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) ,representation="wireframe" )  
 )", sphereResolution, sphereResolution, lensballDesignParams::sphereRadius, lensballDesignParams::sphereRadius, lensballDesignParams::sphereRadius);
+
+			//アパーチャを球で近似して描画する
+			if (drawAparture)py::sf(R"(
+[sphphi,sphtheta] = np.mgrid[0:2*np.pi:%dj,0:np.pi:%dj]
+spx = np.cos(sphphi)*np.sin(sphtheta)
+spy = np.sin(sphphi)*np.sin(sphtheta)
+spz = np.cos(sphtheta)
+mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )  
+)", sphereResolution, sphereResolution, developperParams::apertureRadius, developperParams::apertureRadius, developperParams::apertureRadius);
 		};
-
-
 
 
 
@@ -679,23 +687,33 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 
 			//カメラを生成
 			std::list<arrow3>cameraRayList;
-			//cameraRayList.push_back(arrow3(uvec3::Zero(), uvec3(-1, 0, 0)));
-			for (size_t y = 0; y < developperParams::cameraResH; y++) {
-				const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
-				for (size_t x = 0; x < developperParams::cameraResW; x++) {
-					//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
-
-					const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
-					double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
-
-					//orgが0 wayがスクリーンの正規化
-					Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scx, scy).normalized();
-
-					cameraRayList.push_back(arrow3(developperParams::cameraToGlobal* uvec3(0., 0., 0.), developperParams::cameraToGlobal.rotation()* scnormed));
-					//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().org().z(), cameraRayList.back().dir().x(), cameraRayList.back().dir().y(), cameraRayList.back().dir().z());
-					//py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],color=(1,0,0))", cameraRayList.back().org().x(), cameraRayList.back().dir().x()*30.+ cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().dir().y()*30.+ cameraRayList.back().org().y(),cameraRayList.back().org().z(), cameraRayList.back().dir().z()*30.+ cameraRayList.back().org().z());
-				}
+			//なんか一本だけ作る
+			{
+				//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
+				const ureal scy = 0.2;
+				const ureal scx = 0.2;
+				double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
+				//orgが0 wayがスクリーンの正規化
+				Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scx, scy).normalized();
+				cameraRayList.push_back(arrow3(developperParams::cameraToGlobal * uvec3(0., 0., 0.), developperParams::cameraToGlobal.rotation() * scnormed));
 			}
+
+			//for (size_t y = 0; y < developperParams::cameraResH; y++) {
+			//	const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
+			//	for (size_t x = 0; x < developperParams::cameraResW; x++) {
+			//		//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
+
+			//		const ureal scx = uleap(PairMinusPlus(1. * (developperParams::cameraResW / developperParams::cameraResH)), x / (ureal)(developperParams::cameraResW - 1));
+			//		double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
+
+			//		//orgが0 wayがスクリーンの正規化
+			//		Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scx, scy).normalized();
+
+			//		cameraRayList.push_back(arrow3(developperParams::cameraToGlobal* uvec3(0., 0., 0.), developperParams::cameraToGlobal.rotation()* scnormed));
+			//		//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().org().z(), cameraRayList.back().dir().x(), cameraRayList.back().dir().y(), cameraRayList.back().dir().z());
+			//		//py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],color=(1,0,0))", cameraRayList.back().org().x(), cameraRayList.back().dir().x()*30.+ cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().dir().y()*30.+ cameraRayList.back().org().y(),cameraRayList.back().org().z(), cameraRayList.back().dir().z()*30.+ cameraRayList.back().org().z());
+			//	}
+			//}
 
 			//解像度とかがわかる
 			//つぎに視点ごとにレイトレースしてどの画素に当たるか調べたい
@@ -733,18 +751,21 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )
 							if (refractedRay) {
 								const arrow3 refractedArrowInGlobal(GlobalToBallLocal.untiprograte()* refractedRay.value().org(), GlobalToBallLocal.untiprograte()* refractedRay.value().dir());//レイの向きを戻す
 							
-								//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", refractedArrowInGlobal.org().x(), refractedArrowInGlobal.org().y(), refractedArrowInGlobal.org().z(), refractedArrowInGlobal.dir().x(), refractedArrowInGlobal.dir().y(), refractedArrowInGlobal.dir().z());
-
 								//つぎにプロジェクターのどの画素に当たるかを解く
 								//まず開口に当たるかい
 								if (!ThroughAperture(refractedArrowInGlobal)) {
 									//プロジェクタには入社しなかった
+									if(rdx%47==2)py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(0,0,1))", refractedArrowInGlobal.org().x(), refractedArrowInGlobal.org().y(), refractedArrowInGlobal.org().z(), refractedArrowInGlobal.dir().x(), refractedArrowInGlobal.dir().y(), refractedArrowInGlobal.dir().z());
+										
 									if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
 									return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
 								}
 
 								//開口にあたったらレイの向きで画素を判断できる
 								const auto pixpos = GetPixPosFromEnteredRay(refractedArrowInGlobal.dir());
+								//アパーチャに入ったら違う色で描画してやる
+								py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,color=(1,0,1))", refractedArrowInGlobal.org().x(), refractedArrowInGlobal.org().y(), refractedArrowInGlobal.org().z(), refractedArrowInGlobal.dir().x(), refractedArrowInGlobal.dir().y(), refractedArrowInGlobal.dir().z());
+
 
 								//無効な座標でなければリストに入れる
 								if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
