@@ -29,6 +29,19 @@ namespace bmpLib {
 
 		color(unsigned char _r, unsigned char _g, unsigned char _b):r(_r),g(_g),b(_b){}
 		color() = default;
+
+		//‘«‚µ‚Ü‚·
+		color& operator+=(const color& b) {
+			this->r += b.r;
+			this->g += b.g;
+			this->b += b.b;
+
+			return *this;
+		}
+		color operator*(const double& b) const {
+
+			return color(this->r * b, this->g * b, this->b * b);
+		}
 	} ;
 
 	typedef struct {
