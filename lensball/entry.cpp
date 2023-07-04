@@ -63,7 +63,7 @@ namespace lensballDesignParams {
 };
 //現像時のパラメータ
 namespace developperParams {
-	const ureal apertureRadius = lensballDesignParams::sphereRadius / 200.;//ここにあたったらプロジェクターから出たってこと
+	const ureal apertureRadius = lensballDesignParams::sphereRadius / 100.;//ここにあたったらプロジェクターから出たってこと
 	const auto regularHexagon = [&] {
 		auto hexvjunk = MakeHexagon(sqrt(3.) / 2.);//六角形の頂点
 		hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
@@ -83,9 +83,9 @@ namespace developperParams {
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
-	constexpr size_t antialiasInH = 8;//y方向にこれだけサンプルしてから縮小する
-	constexpr size_t cameraResW = 256, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
-	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
+	constexpr size_t antialiasInH = 1;//y方向にこれだけサンプルしてから縮小する
+	constexpr size_t cameraResW = 1024, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
+	constexpr ureal brightnessCoef = 1.;//明るさ係数　これだけ明るくなる
 
 	constexpr size_t subStepRes=10;//より細かくボールを回す
 
@@ -674,7 +674,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 			std::vector<bool> finFlagOfEachDevThread(developperParams::devThreadNum);//スキャンがおわったことを報告
 			
 			//カメラの変換を変えながらレンダリングする
-			std::vector<std::pair<ureal, ureal>> cameraTransAngleSets = {std::make_pair(0.,0.), std::make_pair(15.,0.), std::make_pair(30.,0.), std::make_pair(15.,0.),
+			std::vector<std::pair<ureal, ureal>> cameraTransAngleSets = {
+				std::make_pair(0.,0.), std::make_pair(15.,0.), std::make_pair(30.,0.), std::make_pair(15.,0.),
 				std::make_pair(0.,0.), std::make_pair(-15.,0.), std::make_pair(-30.,0.), std::make_pair(-15.,0.),
 				std::make_pair(0.,0.), std::make_pair(0., 15.), std::make_pair(0., 30.), std::make_pair(0., 15.),
 				std::make_pair(0.,0.), std::make_pair(0., -15.), std::make_pair(0., -30.), std::make_pair(0., -15.) };//Z軸中心の回転角度、Y軸中心の回転角度の順に[deg]で表記する
