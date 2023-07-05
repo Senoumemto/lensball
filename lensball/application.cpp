@@ -1,6 +1,7 @@
 #include "application.hpp"
 
 using namespace std;
+using py = pythonRuntime;
 
 uptr<matplotlib> SetupPythonRuntime() {
 	uptr<matplotlib> ret = make_unique<matplotlib>();
@@ -443,4 +444,78 @@ void appContext::WriteDammyContext(const std::string appContextPath) {
 
 		exit(0);
 	}
+}
+
+
+void PlotRayInMlab(const arrow3& ray, const std::string& prefix = "") {
+	const uvec3 from = ray.org();
+	uvec3 to = ray.dir() + ray.org();
+	py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],%s)", from.x(), to.x(), from.y(), to.y(), from.z(), to.z(), prefix);
+}
+
+size_t GetBisideIndex(size_t lini, size_t center, int way, const size_t indSiz) {
+	//まず両側インデックスを計算する
+	const size_t bilocalSiz = (lini + 1) / 2;//中心からの相対インデックスの大きさ
+	//符号を計算する
+	const int sign = lini % 2 ? way : -way;
+
+	//-max/2まで行くかな
+	int signedIndex = (sign * (int)bilocalSiz + center);
+	//マイナスならmaxを足す
+	return NormalizeIntger<signed int>(signedIndex, indSiz);
+}
+
+//2dベクトルに要素を加える
+uvec3 ExtendUvec2(const uvec2& v, const ureal& z) {
+	return uvec3(v.x(), v.y(), z);
+}
+//arrowをvec6に変える
+uvec6 ArrowToUVec6(const arrow<3>& v) {
+	return uvec6(v.org().x(), v.org().y(), v.org().z(), v.dir().x(), v.dir().y(), v.dir().z());
+}
+
+//角度を正規化する
+ureal NormalizeAngle(ureal Angle) {
+	const int syuki = (int)(Angle / (2. * pi));//2piがいくつ含まれているか
+	Angle -= syuki * (2. * pi);//これで+-2pi以下にはなったはず
+	if (fabs(Angle) <= pi)return Angle;
+	//絶対値がpiを超えていたら
+	else return (2. * pi) + Angle;
+}
+
+bool IntersectLineAndWay(const std::pair<uvec2, uvec2>& line, const arrow2& ray) {
+	const uvec2 dist = line.first - line.second;//これが線分の傾き
+
+	umat2 expression;//連立方程式を解く
+	uvec2 ans;
+	for (size_t a = 0; a < 2; a++) {
+		expression.row(a)[0] = dist[a];
+		expression.row(a)[1] = -ray.dir()[a];
+		ans[a] = -line.second[a] + ray.org()[a];
+	}
+	if (expression.determinant() == 0.)throw runtime_error("この式は溶けない!!");
+	uvec2 trueans = expression.inverse() * ans;
+
+	return trueans.x() >= 0. && trueans.x() <= 1. && trueans.y() >= 0.;//線分のtが0~1なら かつ半直線のtが正なら
+}
+bool NaihouHanteiX(const uvec2& p, const std::list<uvec2>& vs) {
+	constexpr ureal naihouDist = 0.001;
+
+	auto ite = vs.cbegin();//末尾から一個前
+	size_t xcount = 0, ycount = 0;
+	for (size_t i = 0; i < 6; i++) {
+		//一つ次の頂点をチェック
+		auto nite = std::next(ite);
+
+		//これからなる点
+		const uvec2 ver = *ite;
+		const uvec2 nver = *nite;
+
+		//x方向に伸ばします
+		if (IntersectLineAndWay(make_pair(ver, nver), arrow2(p, uvec2::UnitX())))xcount++;
+		if (IntersectLineAndWay(make_pair(ver, nver), arrow2(p, uvec2::UnitY())))ycount++;
+		ite++;
+	}
+	//x/ycountはそれぞれの方向に線分を伸ばしたときに交差した回数
+	return xcount % 2 && ycount % 2;
 }

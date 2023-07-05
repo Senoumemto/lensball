@@ -40,15 +40,17 @@ namespace bmpLib {
 		}
 		color operator*(const double& b) const {
 
-			return color(this->r * b, this->g * b, this->b * b);
+			return color((unsigned char)(this->r * b), (unsigned char)(this->g * b), (unsigned char)(this->b * b));
 		}
 	} ;
 
-	typedef struct {
+	struct img{
 		long height;
 		long width;
 		std::vector<std::vector<color>> data;
-	} img;
+
+		img():height(0),width(0),data(0){}
+	};
 
 	void ReadBmp(const char* filename, img* imgp);
 	void WriteBmp(const char* filename, img* tp);

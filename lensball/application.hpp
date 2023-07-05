@@ -233,7 +233,7 @@ public:
 
 	projRefraDicHeader(const size_t& hRes, const size_t& vRes, const size_t& rotRes) :
 		rotationRes(rotRes),verticalRes(vRes),horizontalRes(hRes){}
-	projRefraDicHeader() {}
+	projRefraDicHeader() :horizontalRes(0), verticalRes(0), rotationRes(0){}
 
 	//シリアライズできるように
 	template<class Archive> void serialize(Archive& archive) const{
@@ -290,5 +290,35 @@ struct appContext{
 
 	//テスト用に適当な内容のコンテキストを出力する
 	static void WriteDammyContext(const std::string appContextPath);
+
+	appContext():version(0), threadNumMax(0){}
 };
+
+
+//ある半直線(ray)と線分(line)の当たり判定
+bool IntersectLineAndWay(const std::pair<uvec2, uvec2>& line, const arrow2& ray);
+bool NaihouHanteiX(const uvec2& p, const std::list<uvec2>& vs);
+
+
+//2dベクトルに要素を加える
+uvec3 ExtendUvec2(const uvec2& v, const ureal& z);
+//arrowをvec6に変える
+uvec6 ArrowToUVec6(const arrow<3>& v);
+
+//角度を正規化する
+ureal NormalizeAngle(ureal Angle);
+
+//いろいろなものを正規化する　整数番
+template<typename intger>intger NormalizeIntger(const intger& i, const intger& siz) {
+	//正ならmodすればよし
+	if (i > 0)return i % siz;
+	if (i % siz == 0)return 0;//sizの整数倍なら絶対0
+	else return siz + (i % siz);//負なら全体から引けば良い
+}
+
+//0~始まるインデックスを、ある中心から両側に検索するような形に変換する
+size_t GetBisideIndex(size_t lini, size_t center, int way, const size_t indSiz);
+
+//レイを棒で描画する
+void PlotRayInMlab(const arrow3& ray, const std::string& prefix);
 
