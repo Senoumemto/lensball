@@ -10,7 +10,7 @@ const std::string appContextPath(R"(./lensball.context)");//コンテキスト置き場　
 constexpr size_t appContextVersion=1;//コンテキストのバージョン　内容が変わったらこれを更新してください
 
 std::string rezpath = "./";//結果を格納するフォルダ(コンテキストに支配されます)
-const std::string branchpath = "SimVis/";//このbranchの結果を格納するフォルダ
+const std::string branchpath = "ExLens/";//このbranchの結果を格納するフォルダ
 
 using py = pythonRuntime;
 
@@ -59,11 +59,11 @@ namespace lensballDesignParams {
 	}();
 
 
-	constexpr ureal nodelensEta = 1.5;//ノードレンズの比屈折率
+	constexpr ureal nodelensEta = 1.2;//ノードレンズの比屈折率
 };
 //現像時のパラメータ
 namespace developperParams {
-	const ureal apertureRadius = lensballDesignParams::sphereRadius / 100.;//ここにあたったらプロジェクターから出たってこと
+	const ureal apertureRadius = lensballDesignParams::sphereRadius / 300.;//ここにあたったらプロジェクターから出たってこと
 	const auto regularHexagon = [&] {
 		auto hexvjunk = MakeHexagon(sqrt(3.) / 2.);//六角形の頂点
 		hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
@@ -79,13 +79,13 @@ namespace developperParams {
 	const std::string developRezPath = "dev";//branchフォルダ内のここに結果を保存する
 
 	constexpr ureal nodelensExpand = 1. + 1.e-4;//ノードレンズのギリギリに入射したときに判定できるようにする拡大率
-	size_t devThreadNum = 1;//現像をどれだけのスレッドで実行するか(コンテキストに支配されます)
+	size_t devThreadNum = 18;//現像をどれだけのスレッドで実行するか(コンテキストに支配されます)
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
 	constexpr size_t antialiasInH = 1;//y方向にこれだけサンプルしてから縮小する
-	constexpr size_t cameraResW = 1024, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
-	constexpr ureal brightnessCoef = 1.;//明るさ係数　これだけ明るくなる
+	constexpr size_t cameraResW = 2048, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
+	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
 
 	constexpr size_t subStepRes=10;//より細かくボールを回す
 
