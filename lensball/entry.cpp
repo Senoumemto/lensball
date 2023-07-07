@@ -21,7 +21,7 @@ namespace hardwareParams {
 	constexpr size_t numOfProjectionPerACycle = 1024;//一周ごとの投映数
 	constexpr ureal rotationSpeed = projectorFps / (ureal)numOfProjectionPerACycle;//回転速度
 	//解像度
-	constexpr size_t verticalDirectionResolution = sqrt_constexpr(numOfProjectionPerACycle);//垂直解像度(一周に並んでいるレンズの数)
+	constexpr size_t verticalDirectionResolution = sqrt_constexpr((ureal)numOfProjectionPerACycle);//垂直解像度(一周に並んでいるレンズの数)
 	constexpr size_t horizontalDirectionResolution = numOfProjectionPerACycle / verticalDirectionResolution;//水平解像度　位置レンズあたりの投映数
 
 	//プロジェクタのパラメータ
@@ -34,8 +34,9 @@ namespace hardwareParams {
 //レンズボールのデザインパラメータ
 namespace lensballDesignParams {
 
-	constexpr ureal sphereRadius = 1.;//レンズボールの直径
-	const sphereParam lensballParam(uvec3::Zero(), sphereRadius);//レンズボールのパラメータ
+	constexpr ureal sphereRadiusInner = 1.;//レンズボール内径の直径
+	const sphereParam lensballParamInner(uvec3::Zero(), sphereRadiusInner);//レンズボールのパラメータ
+	const sphereParam lensballParamOuter(uvec3::Zero(), sphereRadiusInner);//レンズボールのパラメータ
 	
 	constexpr size_t lensNumInARow = hardwareParams::verticalDirectionResolution;//一行あたりの行の数
 
@@ -62,7 +63,7 @@ namespace lensballDesignParams {
 };
 //現像時のパラメータ
 namespace developperParams {
-	const ureal apertureRadius = lensballDesignParams::sphereRadius / 60.;//ここにあたったらプロジェクターから出たってこと
+	const ureal apertureRadius = lensballDesignParams::sphereRadiusInner / 60.;//ここにあたったらプロジェクターから出たってこと
 	const auto regularHexagon = [&] {
 		auto hexvjunk = MakeHexagon(sqrt(3.) / 2.);//六角形の頂点
 		hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
@@ -150,13 +151,12 @@ public:
 	doubleFaceLensParam() = default;
 	doubleFaceLensParam(const doubleFaceLensParam&) = default;
 	//コピーできます
-	doubleFaceLensParam(const super& s) {
-		*this = s;
+	doubleFaceLensParam(const super& s) :super(s){
+		//*this = s;
 	}
 	//代入できます
 	doubleFaceLensParam& operator=(const super& s) {
-		(super)(*this) = s;
-
+		super::operator=(s);
 		return *this;
 	}
 };
@@ -175,11 +175,10 @@ public:
 	const resultIntersecteSphere& hitParam() const{ return this->second; }
 
 
-	resultSearchNodeLens(const super& s) {
-		(super)(*this) = s;
+	resultSearchNodeLens(const super& s) :super(s){
 	}
 	resultSearchNodeLens& operator=(const super& s) {
-		(super)(*this) = s;
+		super::operator=(s);
 
 		return *this;
 	}
@@ -254,6 +253,9 @@ optional<resultSearchNodeLens> SearchNodeLensHitByARayInBalllocalX(const arrow3&
 				//やっぱり一番近いレンズを見つけておわり
 				if (hitRezVsANode.t < closestT) {
 					hitlensParamInBalllocal = make_pair(thislensparamInBalllocal, hitRezVsANode);
+
+					if (hitlensParamInBalllocal.value().lensParam().inSurf().second == 0.)
+						int ad = 0;
 					closestT = hitRezVsANode.t;
 				}
 			}
@@ -271,10 +273,10 @@ std::optional<arrow3> GetRefractedRayWithASphericalLensX(const arrow3& targetInB
 	const sphereParam& inciSurf = (inciWay == rayIncidentWay::toInner) ? hitlensParamInBalllocal.lensParam().inSurf() : hitlensParamInBalllocal.lensParam().outSurf();
 	const sphereParam& emitSurf = (inciWay == rayIncidentWay::toInner) ? hitlensParamInBalllocal.lensParam().outSurf() : hitlensParamInBalllocal.lensParam().inSurf();
 
-	
 	ray3 targetSeriesInBalllocal(targetInBalllocal);
 	const auto fIntersect = IntersectSphere(targetSeriesInBalllocal.back(), inciSurf.first, inciSurf.second);
-	if (!fIntersect.isHit)throw logic_error("当たり判定のロジックがバグってます");
+	if (!fIntersect.isHit)
+		throw logic_error("当たり判定のロジックがバグってます");
 	fIntersect.ApplyToRay(targetSeriesInBalllocal);
 	if (!RefractSnell(targetSeriesInBalllocal, fIntersect.norm, lensballDesignParams::nodelensEta)) {
 		if (printMessagesInDevelopping)cout << "全反射が起きた(入射時)" << endl;
@@ -345,7 +347,6 @@ bool ThroughAperture(const arrow3& global) {
 	return hitpos.norm() <= developperParams::apertureRadius;
 }
 
-
 //シーンidから回転角度を計算する　substepを含めて実数で渡してね
 ureal GetRotationAngleFromRd(const ureal rd) {
 	return uleap({ 0.,2. * pi }, rd / (ureal)(hardwareParams::numOfProjectionPerACycle));
@@ -391,7 +392,6 @@ int main(int argc, char* argv[]) {
 			else appArgs = usercon.defaultArg;
 		}
 
-
 		//Pythonをセットアップしてからレンズボールの概形を書く
 		constexpr bool drawSphere = false;//レンズボール概形を描画する
 		constexpr bool drawAparture = false;//アパーチャを描画する
@@ -417,7 +417,7 @@ spx = np.cos(sphphi)*np.sin(sphtheta)
 spy = np.sin(sphphi)*np.sin(sphtheta)
 spz = np.cos(sphtheta)
 mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) ,representation="wireframe" )  
-)", sphereResolution, sphereResolution, lensballDesignParams::sphereRadius, lensballDesignParams::sphereRadius, lensballDesignParams::sphereRadius);
+)", sphereResolution, sphereResolution, lensballDesignParams::sphereRadiusInner, lensballDesignParams::sphereRadiusInner, lensballDesignParams::sphereRadiusInner);
 
 			//アパーチャを球で近似して描画する
 			if (drawAparture)py::sf(R"(
@@ -464,9 +464,26 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					const auto localcenterInBalllocalPolar = MapToLocalPolar(localcenterInMap);
 					const uvec3 localcenterInBalllocal = PolarToXyz(localcenterInBalllocalPolar);
 
+					//レンズの半径を全反射が生じないようなサイズにして解く
+					const ureal lensRadius=[&]{
+						constexpr ureal lensWidthCrossHalfInMap = (2. * pi / lensballDesignParams::lensNumInARow) * (2. / sqrt_constexpr(3.))/2.;//マップでのレンズの対角幅の半分
+
+						//最終的にθ方向の拡がり角が分かればOK
+						const ureal lensWidthInTheta = uvec2(MapToLocalPolar(localcenterInMap + uvec2(0., lensWidthCrossHalfInMap)) - MapToLocalPolar(localcenterInMap - uvec2(0., lensWidthCrossHalfInMap))).y();//レンズの上から下を引いたらbシータの角度差のはず
+						const ureal lensWidthGenLength = 2. * lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta / 2.);//そいつの弦の長さ
+
+						//つぎに全反射角を決めたい
+						const ureal rinkaiAngle = asin(1. / lensballDesignParams::nodelensEta);
+
+						//頑張って解くと半径がこのように求まるらしい
+						const ureal dammyRadius = lensWidthGenLength / (2. * sin(rinkaiAngle - lensWidthInTheta / 2.));
+						return dammyRadius;
+					}();
+
 					//パラメータを登録
-					nodelensParamsFrontBackRez[make_pair(rd, ld)] = make_pair(sphereParam(localcenterInBalllocal, 1.1 * lensballDesignParams::nodeLensRadius * fabs(cos(localcenterInBalllocalPolar.y()))),
-						sphereParam(localcenterInBalllocal, 1.1 * lensballDesignParams::nodeLensRadius * fabs(cos(localcenterInBalllocalPolar.y()))));
+					nodelensParamsFrontBackRez[make_pair(rd, ld)].operator=(make_pair(sphereParam(localcenterInBalllocal, lensRadius), sphereParam(localcenterInBalllocal, lensRadius)));
+
+					int a = 0;
 
 					//要素レンズを描画していく
 					if (drawNodelenses || drawNodelensEdges) {
@@ -505,11 +522,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 		};
 
 
-
-
-
 		//スキャンをする
-		constexpr bool scanLenses = false;//レンズボールに対するレイトレーシングを行う
+		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		constexpr bool logWarningInScan = false;//scan中の警告を表示する
 		if (scanLenses) {
@@ -551,7 +565,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 						const arrow3 rayArrowInBalllocal(uvec3::Zero(), GlobalToBallLocal.prograte() * rayDirInGlobal);//ローカルで表したレイ
 
 						//このレイがレンズボールに当たるか
-						const auto hitRezVsSphere = IntersectSphere(rayArrowInBalllocal, lensballDesignParams::lensballParam.first, lensballDesignParams::lensballParam.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
+						const auto hitRezVsSphere = IntersectSphere(rayArrowInBalllocal, lensballDesignParams::lensballParamInner.first, lensballDesignParams::lensballParamInner.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
 						if (!hitRezVsSphere.isHit)throw logic_error("プロジェクタから放出されているんだから絶対当たるはずなの");
 
 						//要素レンズをサーチ
@@ -632,7 +646,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//デベロップセクション
-		constexpr bool developImage = true;
+		constexpr bool developImage = false;
 		constexpr bool printMessagesInDevelopping = developImage && false;//デベロップ中のメッセージを出力するか
 		if (developImage) {
 			projRefraDicHeader header;
@@ -654,10 +668,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 			
 			//カメラの変換を変えながらレンダリングする
 			std::vector<std::pair<ureal, ureal>> cameraTransAngleSets = {
-				std::make_pair(0.,0.), std::make_pair(15.,0.), std::make_pair(30.,0.), std::make_pair(15.,0.),
+				std::make_pair(0.,0.)/*, std::make_pair(15.,0.), std::make_pair(30.,0.), std::make_pair(15.,0.),
 				std::make_pair(0.,0.), std::make_pair(-15.,0.), std::make_pair(-30.,0.), std::make_pair(-15.,0.),
 				std::make_pair(0.,0.), std::make_pair(0., 15.), std::make_pair(0., 30.), std::make_pair(0., 15.),
-				std::make_pair(0.,0.), std::make_pair(0., -15.), std::make_pair(0., -30.), std::make_pair(0., -15.) };//Z軸中心の回転角度、Y軸中心の回転角度の順に[deg]で表記する
+				std::make_pair(0.,0.), std::make_pair(0., -15.), std::make_pair(0., -30.), std::make_pair(0., -15.) */};//Z軸中心の回転角度、Y軸中心の回転角度の順に[deg]で表記する
 			for (size_t ctd = 0; ctd < cameraTransAngleSets.size();ctd++) {
 				developperParams::cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(cameraTransAngleSets.at(ctd).second / 180. * pi, uvec3::UnitY()) * Eigen::AngleAxis<ureal>(cameraTransAngleSets.at(ctd).first / 180. * pi, uvec3::UnitZ()) * Eigen::Translation<ureal, 3>(uvec3(30., 0., 0.)));//カメラの変換をセットする
 				
@@ -697,7 +711,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					const auto GetColorOfCamPix = [&](const decltype(cameraRayList)::const_iterator cameraRayIte, const ivec2& pixOfCam) {//レイを特定してローカルを計算
 						const arrow3 targetInBalllocal(GlobalToBallLocal.prograte() * (*cameraRayIte).org(), GlobalToBallLocal.prograte() * (*cameraRayIte).dir());
 						//このレイがレンズボールに当たるか
-						const auto hitRezVsSphere = IntersectSphere(targetInBalllocal, lensballDesignParams::lensballParam.first, lensballDesignParams::lensballParam.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
+						const auto hitRezVsSphere = IntersectSphere(targetInBalllocal, lensballDesignParams::lensballParamOuter.first, lensballDesignParams::lensballParamOuter.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
 
 						if (hitRezVsSphere.isHit) {
 
@@ -705,6 +719,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 							const auto hitlensParamInBalllocal = SearchNodeLensHitByARayInBalllocalX(targetInBalllocal, hitRezVsSphere, nodelensParamsFrontBackInBalllocal.value(), developperParams::searchAreaInARow, developperParams::searchAreaInALen, rayIncidentWay::toOuter);//カメラは外側!
 
 							if (hitlensParamInBalllocal) {//要素レンズに当たったら
+								if (hitlensParamInBalllocal.value().lensParam().inSurf().second == 0.)
+									int a = 0;
 								//屈折
 								const auto refractedRay = GetRefractedRayWithASphericalLensX(targetInBalllocal, hitlensParamInBalllocal.value(), printMessagesInDevelopping, rayIncidentWay::toOuter);
 								if (refractedRay) {
