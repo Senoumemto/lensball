@@ -195,4 +195,22 @@ template < typename T > constexpr T sqrt_constexpr(T s) {
 	return x;
 }
 
+//この変数を使うときに必ずmutexをロックするようになる 所有権もこいつが持ってるよ
+template<typename VAL>class mutexedVariant :public std::mutex {
+private:
+	using super = std::mutex;
+	std::unique_ptr<VAL> val;
+public:
+	mutexedVariant() :super(), val(new VAL){}
+	mutexedVariant(const VAL&& v) :super() {
+		val = make_unique(v);
+	}
+
+	std::unique_ptr<VAL>& GetAndLock() {
+		this->lock();
+
+		return val;
+	}
+};
+
 #endif

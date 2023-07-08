@@ -63,15 +63,15 @@ namespace lensballDesignParams {
 };
 //現像時のパラメータ
 namespace developperParams {
-	const ureal apertureRadius = lensballDesignParams::sphereRadiusInner / 60.;//ここにあたったらプロジェクターから出たってこと
+	const ureal apertureRadius = lensballDesignParams::sphereRadiusInner / 300.;//ここにあたったらプロジェクターから出たってこと
 	const auto regularHexagon = [&] {
 		auto hexvjunk = MakeHexagon(sqrt(3.) / 2.);//六角形の頂点
 		hexvjunk.push_back(hexvjunk.front());//一周するために最初の点を末尾に挿入
 
 		return hexvjunk;
 	}();//外接円の半径が1になるような六角形
-	constexpr size_t searchAreaInALen = 5;//同じ行のレンズをどれだけ深追いして検索するか
-	constexpr size_t searchAreaInARow = 5;//列をどれだけ深追いして検索するか
+	constexpr size_t searchAreaInALen = lensballDesignParams::lensNumInARow;//同じ行のレンズをどれだけ深追いして検索するか
+	constexpr size_t searchAreaInARow = lensballDesignParams::rowNum;//列をどれだけ深追いして検索するか
 	//あたりを付けたノードレンズから探索する範囲
 	//まずヘッダを読み出す
 	const std::string framePrefixX = "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
@@ -186,8 +186,44 @@ public:
 	resultSearchNodeLens() = default;
 
 };
-//要素レンズを検索する 内側からか外側からかで振る舞いが変わります
-optional<resultSearchNodeLens> SearchNodeLensHitByARayInBalllocalX(const arrow3& targetInBalllocal, const resultIntersecteSphere& hitRezVsSphere, const nodeLensDic& nodelensParamsInBalllocal, const size_t searchAreaInARow, const size_t searchAreaInALen,const rayIncidentWay& enterFrom) {
+
+//Search Node lens関数が最初に当たりをつけたレンズからどれほど離れたレンズを結果として返したかを格納する　これがリミット寸前ならリミットの設定がおかしいかもしれない
+class accuracyOfSearchNodelenses:private std::pair<size_t,size_t> {
+	using super = std::pair<size_t, size_t>;
+public:
+
+	super::first_type& distOfRow() { return this->first; }
+	super::first_type& distOfLens() { return this->second; }
+	const super::first_type& distOfRow() const{ return this->first; }
+	const super::first_type& distOfLens() const{ return this->second; }
+
+	//与えられたaccuracyと比較してこのaccurasyを最悪に更新する
+	accuracyOfSearchNodelenses& UpdateThisToWorth(const accuracyOfSearchNodelenses& op) {
+		//各要素ごとの最大をとる
+		this->distOfRow() = std::max(this->distOfRow(), op.distOfRow());
+		this->distOfLens() = std::max(this->distOfLens(), op.distOfLens());
+
+		return *this;
+	}
+	std::string str() {
+		stringstream ss;
+		ss << "row: " << this->distOfRow() << ",\t lens: " << this->distOfLens();
+		return ss.str();
+	}
+
+	accuracyOfSearchNodelenses(const super& s) :super(s) {
+	}
+	accuracyOfSearchNodelenses& operator=(const super& s) {
+		super::operator=(s);
+
+		return *this;
+	}
+
+	accuracyOfSearchNodelenses() :super(0, 0){}
+};
+
+//要素レンズを検索する 内側からか外側からかで振る舞いが変わります 	
+optional<std::pair<resultSearchNodeLens, accuracyOfSearchNodelenses>> SearchNodeLensHitByARayInBalllocalX(const arrow3& targetInBalllocal, const resultIntersecteSphere& hitRezVsSphere, const nodeLensDic& nodelensParamsInBalllocal, const size_t searchAreaInARow, const size_t searchAreaInALen,const rayIncidentWay& enterFrom) {
 
 	//レイとレンズボールの交差位置をいろんな座標系で計算
 	//const auto& targetTVsBall = hitRezVsSphere.t;
@@ -214,7 +250,7 @@ optional<resultSearchNodeLens> SearchNodeLensHitByARayInBalllocalX(const arrow3&
 	//ではここからレンズに当たりをつける
 	ureal closestT = std::numeric_limits<ureal>::infinity();//見つかったレンズの距離
 	std::pair<size_t, size_t> hitlensIds;
-	std::optional<resultSearchNodeLens> hitlensParamInBalllocal;//対象のレンズパラメータと衝突法線　ボールローカルで
+	optional<std::pair<resultSearchNodeLens, accuracyOfSearchNodelenses>> hitlensParamInBalllocal;//対象のレンズパラメータと衝突法線　ボールローカルで
 
 	for (size_t rilini = 0; rilini < searchAreaInARow; rilini++) {//検索範囲は全部の行
 		const size_t rid = GetBisideIndex(rilini, centerRawIndex, rawSearchWay, lensballDesignParams::rowNum);//当たりをつけたところから放射状に探索する
@@ -252,9 +288,9 @@ optional<resultSearchNodeLens> SearchNodeLensHitByARayInBalllocalX(const arrow3&
 			if (hitRezVsANode.isHit && hitRezVsANode.t < hitRezVsSphere.t) {
 				//やっぱり一番近いレンズを見つけておわり
 				if (hitRezVsANode.t < closestT) {
-					hitlensParamInBalllocal = make_pair(thislensparamInBalllocal, hitRezVsANode);
+					hitlensParamInBalllocal = make_pair(make_pair(thislensparamInBalllocal, hitRezVsANode), make_pair(rilini, lidlini));
 
-					if (hitlensParamInBalllocal.value().lensParam().inSurf().second == 0.)
+					if (hitlensParamInBalllocal.value().first.lensParam().inSurf().second == 0.)
 						int ad = 0;
 					closestT = hitRezVsANode.t;
 				}
@@ -305,7 +341,7 @@ std::optional<arrow3> GetRefractedRayWithASphericalLensX(const arrow3& targetInB
 }
 
 //カメラ映像を保存する
-void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList, const std::unordered_map < ivec2, ureal >& colorSiz, const std::string& filename) {
+void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList, const std::unordered_map < ivec2, ureal >& colorSiz, const std::string& filename, const bool useTimestamp=true) {
 
 	bmpLib::img picture;//カメラからの映像
 	picture.width = developperParams::cameraResW;
@@ -332,8 +368,27 @@ void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList, const s
 			}
 		}
 	}
-	bmpLib::WriteBmp((rezpath + branchpath + filename + ".bmp").c_str(), &picture);
-	bmpLib::WriteBmp((rezpath + branchpath + "_" + filename + ".mask").c_str(), &maskPic);
+
+	const std::string filenameSufix = [&] {
+		//名前にタイムスタンプをつける
+		if (useTimestamp) {
+			const auto timestampText = [&] {
+				std::chrono::zoned_time zonedTimestamp{ std::chrono::current_zone(), std::chrono::system_clock::now() };
+				auto truncated = std::chrono::time_point_cast<std::chrono::milliseconds>(zonedTimestamp.get_local_time());
+
+
+				stringstream ss;
+				ss << std::format("({:%y%m%d_%H%M%S})", truncated);
+
+				return (std::string)ss.str();
+			}();
+			return timestampText;
+		}
+		else return std::string("");
+	}();
+
+	bmpLib::WriteBmp((rezpath + branchpath + filename + filenameSufix + ".bmp").c_str(), &picture);
+	bmpLib::WriteBmp((rezpath + branchpath + "_mask" + filename + filenameSufix + ".bmp").c_str(), &maskPic);
 }
 
 //アパーチャ
@@ -523,7 +578,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//スキャンをする
-		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
+		constexpr bool scanLenses = false;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		constexpr bool logWarningInScan = false;//scan中の警告を表示する
 		if (scanLenses) {
@@ -538,6 +593,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 			ResetPyVecSeries<6>(quiverSeries, quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
+
+			//このスキャンの正確さ
+			mutexedVariant<accuracyOfSearchNodelenses> searchAccuracyOfTheScanX;
 
 
 			//指定された結果を指定されたストレージへ送信する 転送したあとはRezはクリアされます
@@ -556,6 +614,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				//結果格納メモリとストレージを用意する
 				std::list<arrow3> rezMem;
 				std::ofstream storageStream(rezpath + branchpath + scanParams::resultDicPrefix + ".part" + to_string(rd), std::ios::binary);
+
+				//要素レンズ検索の正確さインジゲータ(最初に当たりをつけた部分からどれだけ離れた位置を検索したか)
+				accuracyOfSearchNodelenses searchAccuracyOfTheScene;
 
 				//各ピクセルから飛び出るレイと回転角度rdの球との当たり判定を行う
 				for (std::decay<decltype(hardwareParams::projectorResInTheta)>::type vpd = 0; vpd < hardwareParams::projectorResInTheta; vpd++) {//プロジェクタの注目画素ごとに
@@ -576,9 +637,11 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 							rezMem.push_back(arrow3(uvec3::Zero(), uvec3::Zero()));
 						}
 						else {
+							//正確さを更新しとく
+							searchAccuracyOfTheScene.UpdateThisToWorth(hitRezVsANodelens.value().second);
 
 							//焦点の場所は要素レンズが確定すれば計算できる
-							const auto refractedInBalllocal = GetRefractedRayWithASphericalLensX(rayArrowInBalllocal, hitRezVsANodelens.value(), logWarningInScan, rayIncidentWay::toInner);
+							const auto refractedInBalllocal = GetRefractedRayWithASphericalLensX(rayArrowInBalllocal, hitRezVsANodelens.value().first, logWarningInScan, rayIncidentWay::toInner);
 							if (!refractedInBalllocal) {
 								//全反射するなら計算する必要がない
 								if (logWarningInScan)cout << "ふつうに屈折して出れなかったよ" << endl;
@@ -604,6 +667,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 				//スキャンが終わったらセーブ
 				TransRezToStorage(rezMem, storageStream);
+				//一応worthも更新
+				searchAccuracyOfTheScanX.GetAndLock()->UpdateThisToWorth(searchAccuracyOfTheScene);
+				searchAccuracyOfTheScanX.unlock();
 
 				*finflagOfStIte = true;
 			};
@@ -646,7 +712,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//デベロップセクション
-		constexpr bool developImage = false;
+		constexpr bool developImage = true;
 		constexpr bool printMessagesInDevelopping = developImage && false;//デベロップ中のメッセージを出力するか
 		if (developImage) {
 			projRefraDicHeader header;
@@ -666,6 +732,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 			std::vector<uptr<std::thread>> devThreads(developperParams::devThreadNum);
 			std::vector<bool> finFlagOfEachDevThread(developperParams::devThreadNum);//スキャンがおわったことを報告
 			
+			//現像での要素レンズ検索の正確さインジゲータ(最初に当たりをつけた部分からどれだけ離れた位置を検索したか)
+			mutexedVariant<accuracyOfSearchNodelenses> searchAccuracyOfTheDevelopping;
+
 			//カメラの変換を変えながらレンダリングする
 			std::vector<std::pair<ureal, ureal>> cameraTransAngleSets = {
 				std::make_pair(0.,0.)/*, std::make_pair(15.,0.), std::make_pair(30.,0.), std::make_pair(15.,0.),
@@ -699,6 +768,9 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				std::unordered_map<ivec2, ureal> colorSiz;//受光素子に何シーン光が入射したか
 				//あるシーンでのカメラ映像をけいさんする関数
 				const auto GetAFrameOfAScene = [&](const size_t rdx, const decltype(finFlagOfEachDevThread)::iterator finflag) {
+					//この計算での//要素レンズ検索の正確さインジゲータ(最初に当たりをつけた部分からどれだけ離れた位置を検索したか)
+					accuracyOfSearchNodelenses searchAccuracyOfTheScene;
+
 					////まずはフレームを読み出す
 					const auto thisFrame = make_unique<bmpLib::img>();
 					bmpLib::ReadBmp((rezpath + branchpath + developperParams::framePrefixX + to_string(rdx / developperParams::subStepRes) + ".bmp").c_str(), thisFrame.get());
@@ -719,37 +791,38 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 							const auto hitlensParamInBalllocal = SearchNodeLensHitByARayInBalllocalX(targetInBalllocal, hitRezVsSphere, nodelensParamsFrontBackInBalllocal.value(), developperParams::searchAreaInARow, developperParams::searchAreaInALen, rayIncidentWay::toOuter);//カメラは外側!
 
 							if (hitlensParamInBalllocal) {//要素レンズに当たったら
-								if (hitlensParamInBalllocal.value().lensParam().inSurf().second == 0.)
-									int a = 0;
+								//accuracyを更新
+								searchAccuracyOfTheScene.UpdateThisToWorth(hitlensParamInBalllocal.value().second);
+
 								//屈折
-								const auto refractedRay = GetRefractedRayWithASphericalLensX(targetInBalllocal, hitlensParamInBalllocal.value(), printMessagesInDevelopping, rayIncidentWay::toOuter);
+								const auto refractedRay = GetRefractedRayWithASphericalLensX(targetInBalllocal, hitlensParamInBalllocal.value().first, printMessagesInDevelopping, rayIncidentWay::toOuter);
 								if (refractedRay) {
 									const arrow3 refractedArrowInGlobal(GlobalToBallLocal.untiprograte() * refractedRay.value().org(), GlobalToBallLocal.untiprograte() * refractedRay.value().dir());//レイの向きを戻す
 
-									//つぎにプロジェクターのどの画素に当たるかを解く
-									//まず開口に当たるかい
-									if (!ThroughAperture(refractedArrowInGlobal)) {
-										//プロジェクタには入社しなかった
-										//if (rdx % (int)(developperParams::subStepRes*2.24) == 2)PlotRayInMlab(refractedArrowInGlobal,"color=(0,0,1), tube_radius=0.01");
+//つぎにプロジェクターのどの画素に当たるかを解く
+//まず開口に当たるかい
+if (!ThroughAperture(refractedArrowInGlobal)) {
+	//プロジェクタには入社しなかった
+	//if (rdx % (int)(developperParams::subStepRes*2.24) == 2)PlotRayInMlab(refractedArrowInGlobal,"color=(0,0,1), tube_radius=0.01");
 
-										if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
-										return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
-									}
+	if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
+	return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
+}
 
-									//開口にあたったらレイの向きで画素を判断できる
-									const auto pixpos = GetPixPosFromEnteredRay(refractedArrowInGlobal.dir());
-									//アパーチャに入ったら違う色で描画してやる
-									//PlotRayInMlab(refractedArrowInGlobal, "color=(1,0,1), tube_radius=0.01");
+//開口にあたったらレイの向きで画素を判断できる
+const auto pixpos = GetPixPosFromEnteredRay(refractedArrowInGlobal.dir());
+//アパーチャに入ったら違う色で描画してやる
+//PlotRayInMlab(refractedArrowInGlobal, "color=(1,0,1), tube_radius=0.01");
 
-									//無効な座標でなければリストに入れる
-									if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
-										const auto pixColor = thisFrame.get()->data.at(pixpos.y()).at(pixpos.x());//フレームから色を取り出す
-										//cout << "rez: " << pixpos.x() << "\t" << pixpos.y() << "\t";
-										return std::optional<uvec3>(uvec3(pixColor.r, pixColor.g, pixColor.b));
-									}
-									else {
-										//cout << "invalid: " << pixpos.x() << "\t" << pixpos.y() << "\t";
-									}
+//無効な座標でなければリストに入れる
+if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
+	const auto pixColor = thisFrame.get()->data.at(pixpos.y()).at(pixpos.x());//フレームから色を取り出す
+	//cout << "rez: " << pixpos.x() << "\t" << pixpos.y() << "\t";
+	return std::optional<uvec3>(uvec3(pixColor.r, pixColor.g, pixColor.b));
+}
+else {
+	//cout << "invalid: " << pixpos.x() << "\t" << pixpos.y() << "\t";
+}
 								}
 							}
 
@@ -786,6 +859,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 							}
 						}
 
+					searchAccuracyOfTheDevelopping.GetAndLock()->UpdateThisToWorth(searchAccuracyOfTheScene);
+					searchAccuracyOfTheDevelopping.unlock();
 					*finflag = true;
 				};
 
@@ -822,6 +897,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				//映像をBMPとして書き出す
 				WriteBmpOfCamera(colorList, colorSiz, StringFormat("rez%d", ctd));
 			}
+
+			//Accuracyでも表示してみる
+			cout <<"Search accuracy In developping: "<< searchAccuracyOfTheDevelopping.GetAndLock()->str() << endl;
+			searchAccuracyOfTheDevelopping.unlock();
 		}
 
 
