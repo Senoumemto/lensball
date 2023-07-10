@@ -70,8 +70,8 @@ namespace developperParams {
 
 		return hexvjunk;
 	}();//外接円の半径が1になるような六角形
-	constexpr size_t searchAreaInALen = lensballDesignParams::lensNumInARow;//同じ行のレンズをどれだけ深追いして検索するか
-	constexpr size_t searchAreaInARow = lensballDesignParams::rowNum;//列をどれだけ深追いして検索するか
+	constexpr size_t searchAreaInALen = 8;//同じ行のレンズをどれだけ深追いして検索するか
+	constexpr size_t searchAreaInARow = 8;//列をどれだけ深追いして検索するか
 	//あたりを付けたノードレンズから探索する範囲
 	//まずヘッダを読み出す
 	const std::string framePrefixX = "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
@@ -84,10 +84,10 @@ namespace developperParams {
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
 	constexpr size_t antialiasInH = 1;//y方向にこれだけサンプルしてから縮小する
-	constexpr size_t cameraResW = 64, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
+	constexpr size_t cameraResW = 1024, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
 	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
 
-	constexpr size_t subStepRes=1;//より細かくボールを回す
+	constexpr size_t subStepRes=10;//より細かくボールを回す
 
 	auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(0. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
 };
