@@ -95,8 +95,8 @@ namespace developperParams {
 namespace scanParams {
 	size_t scanThreadNum = 1;//スキャンに使うスレッド数(コンテキストに支配されます)
 	const std::string resultDicPrefix = "dic\\dic";
-	constexpr size_t searchAreaInALen = 5;//同じ行のレンズをどれだけ深追いして検索するか
-	constexpr size_t searchAreaInARow = 5;//列をどれだけ深追いして検索するか
+	constexpr size_t searchAreaInALen = 11;//同じ行のレンズをどれだけ深追いして検索するか
+	constexpr size_t searchAreaInARow =11;//列をどれだけ深追いして検索するか
 }
 
 ureal GetLatitudeInMapDFromRowIndex(size_t row) {
@@ -543,15 +543,15 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 						const ureal lensWidthInTheta = acos(PolarToXyz(MapToLocalPolar(localcenterInMap + lensWidthHalfVecInMapD)).dot(PolarToXyz(MapToLocalPolar(localcenterInMap - lensWidthHalfVecInMapD))));//レンズの上から下を引いたらbシータの角度差のはず
 						const ureal lensWidthGenLength = 2.*lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta/2.);//そいつの弦の長さ
 						const ureal lensWidthKoLength = lensballDesignParams::lensballParamInner.second * lensWidthInTheta;//そいつの孤の長さ
-						return lensWidthGenLength /2.;
-
+						//return lensWidthGenLength /2.;
+						//このサイズを基準としてどれだけ拡大すれば全反射が起きないのか計算する
 
 						//つぎに全反射角を決めたい
 						const ureal rinkaiAngle = asin(1. / lensballDesignParams::nodelensEta);
-
-						//頑張って解くと半径がこのように求まるらしい
-						const ureal dammyRadius = lensWidthGenLength / (2. * sin(rinkaiAngle - lensWidthInTheta / 2.))*1.;
-						//return dammyRadius;
+						//臨界角がわかると法線がその角度となるときのx座標(半径を1としたときの)がわかる プラス側
+						const ureal xWhereANormisRinkai = (rinkaiAngle * sqrt(pow(rinkaiAngle, 2) + 1.)) / (pow(rinkaiAngle, 2) + 1.);
+						//つまりこれ分の一すればギリギリ端っこで臨界角のはず
+						return lensWidthGenLength / 2./ xWhereANormisRinkai;
 					}();
 
 					//パラメータを登録
@@ -560,7 +560,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					int a = 0;
 
 					//要素レンズを描画していく
-					if ((drawNodelenses || drawNodelensEdges)&&ld==0) {
+					if ((drawNodelenses || drawNodelensEdges)) {
 
 						//つぎに極座標で要素レンズを計算する
 						ResetPyVecSeries(nlensSeries);//ノードレンズ
@@ -756,6 +756,11 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 			//拡がり角とvisible area radiusを表示
 			cout <<"MAX ANG: " << maxangle*180./pi<<" deg\tMIN ANG: " << minangle * 180. / pi<<endl;
 			cout << "MAX RAD: " << SolveVisibleAreaRadiusFromRefractAngle(maxangle) << "\tMIN RAD: " << SolveVisibleAreaRadiusFromRefractAngle(minangle) << endl;
+
+			//正確さも表示する
+			const auto& accu = searchAccuracyOfTheScanX.GetAndLock();
+			cout << accu->distOfRow() << "\t" << accu->distOfLens() << endl;
+			searchAccuracyOfTheScanX.unlock();
 		};
 
 
