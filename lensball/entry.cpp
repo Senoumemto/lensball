@@ -521,6 +521,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 					//レンズの半径を全反射が生じないようなサイズにして解く
 					const ureal lensRadius=[&]{
+
+						return 1.1 * (2. * lensballDesignParams::lensEdgeWidth / sqrt(3.)) * fabs(cos(localcenterInBalllocalPolar.y()));
 						const ureal lensWidthCrossHalfInMapD = lensballDesignParams::lensEdgeWidth * (2. / sqrt_constexpr(3.));//マップでのレンズの対角幅の半分
 						lensballDesignParams::hexverticesNodelensOuter;
 						const uvec2 lensWidthHalfVecInMap = lensballDesignParams::DesignedMapToMap.prograte() * uvec2(0., lensWidthCrossHalfInMapD);//Map上でのレンズの対角ベクトルの半分
