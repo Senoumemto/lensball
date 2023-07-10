@@ -46,7 +46,7 @@ namespace lensballDesignParams {
 	const ureal eachRowsDistance = 1.5 * rowLength / sqrt(3.) / (ureal)lensNumInARow;//六角形の一変だけシフトする
 	const bitrans<Eigen::Rotation2D<ureal>> DesignedMapToMap = bitrans<Eigen::Rotation2D<ureal>>(Eigen::Rotation2D<ureal>(rowAngle));//レンズアレイを傾斜させる前から傾斜させたあとにする
 
-	const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の半径
+	//const ureal nodeLensRadius = 2. * lensEdgeWidth / sqrt(3.);//要素レンズ形状を作成　球の半径
 	const std::pair<size_t, size_t> nodeLensResolution = make_pair(20 * 2, 20);//要素レンズの分割数
 	constexpr size_t rowNum = 15;//奇数にしてね 行の数
 
@@ -492,8 +492,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 		//レンズアレイを作成、描画する
 		//六角形でタイリングする　偶数行を書いてから奇数行を書くって感じ
 		constexpr bool calcNodelenses = true;//ノードレンズの位置を計算してレンズボールを形成する
-		constexpr bool drawNodelenses = calcNodelenses & false;//要素レンズを描画する
-		constexpr bool drawNodelensEdges = calcNodelenses & false;//ノードレンズの枠線を描画する
+		constexpr bool drawNodelenses = calcNodelenses & true;//要素レンズを描画する
+		constexpr bool drawNodelensEdges = calcNodelenses & true;//ノードレンズの枠線を描画する
 
 		//この計算で要素レンズリストがわかるよ
 		std::optional<nodeLensDic> nodelensParamsFrontBackInBalllocal = std::nullopt;//行番号　レンズ番号がキーでパラメータをBalllocalで保存する 入射面と出射面で別々のパラメータを割り当てられる
@@ -521,17 +521,22 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 					//レンズの半径を全反射が生じないようなサイズにして解く
 					const ureal lensRadius=[&]{
-						constexpr ureal lensWidthCrossHalfInMap = (2. * pi / lensballDesignParams::lensNumInARow) * (2. / sqrt_constexpr(3.))/2.;//マップでのレンズの対角幅の半分
+						const ureal lensWidthCrossHalfInMapD = lensballDesignParams::lensEdgeWidth * (2. / sqrt_constexpr(3.));//マップでのレンズの対角幅の半分
+						lensballDesignParams::hexverticesNodelensOuter;
+						const uvec2 lensWidthHalfVecInMap = lensballDesignParams::DesignedMapToMap.prograte() * uvec2(0., lensWidthCrossHalfInMapD);//Map上でのレンズの対角ベクトルの半分
+
 
 						//最終的にθ方向の拡がり角が分かればOK
-						const ureal lensWidthInTheta = uvec2(MapToLocalPolar(localcenterInMap + uvec2(0., lensWidthCrossHalfInMap)) - MapToLocalPolar(localcenterInMap - uvec2(0., lensWidthCrossHalfInMap))).y();//レンズの上から下を引いたらbシータの角度差のはず
+						const ureal lensWidthInTheta = acos(PolarToXyz(MapToLocalPolar(localcenterInMap + lensWidthHalfVecInMap)).dot(PolarToXyz(MapToLocalPolar(localcenterInMap - lensWidthHalfVecInMap))));//レンズの上から下を引いたらbシータの角度差のはず
 						const ureal lensWidthGenLength = 2. * lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta / 2.);//そいつの弦の長さ
+						return lensWidthGenLength;
+
 
 						//つぎに全反射角を決めたい
 						const ureal rinkaiAngle = asin(1. / lensballDesignParams::nodelensEta);
 
 						//頑張って解くと半径がこのように求まるらしい
-						const ureal dammyRadius = lensWidthGenLength / (2. * sin(rinkaiAngle - lensWidthInTheta / 2.));
+						const ureal dammyRadius = lensWidthGenLength / (2. * sin(rinkaiAngle - lensWidthInTheta / 2.))*1.;
 						return dammyRadius;
 					}();
 
@@ -552,7 +557,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(lensballDesignParams::nodeLensResolution.first - 1)),
 									uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(lensballDesignParams::nodeLensResolution.second - 1)));//要素レンズローカルでの極座標
 
-								const uvec3 nodelensShape = (lensballDesignParams::nodeLensRadius * fabs(cos(localcenterInBalllocalPolar.y()))) * PolarToXyz(localpos);//これが球になるはず
+								const uvec3 nodelensShape = (lensRadius * fabs(cos(localcenterInBalllocalPolar.y()))) * PolarToXyz(localpos);//これが球になるはず
 								AppendPyVecSeries(mlabSeries, nodelensShape + localcenterInBalllocal);
 							}
 							if (drawNodelenses)py::s("nlx.append(mlabvx)\nnly.append(mlabvy)\nnlz.append(mlabvz)\n");//これでメッシュになると思うんやけど
@@ -578,7 +583,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//スキャンをする
-		constexpr bool scanLenses = false;//レンズボールに対するレイトレーシングを行う
+		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		constexpr bool logWarningInScan = false;//scan中の警告を表示する
 		if (scanLenses) {
@@ -591,12 +596,13 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 			const projRefraDicHeader storageheader(hardwareParams::projectorResInPhi, hardwareParams::projectorResInTheta, hardwareParams::numOfProjectionPerACycle);
 			storageheader.SaveHeader(rezpath + branchpath + scanParams::resultDicPrefix);
 
+
 			ResetPyVecSeries<6>(quiverSeries, quiverPrefix);//ベクトル場をお掃除
 			ResetPyVecSeries(pypltSeries);//ベクトル場をお掃除
 
 			//このスキャンの正確さ
 			mutexedVariant<accuracyOfSearchNodelenses> searchAccuracyOfTheScanX;
-
+			mutexedVariant<std::list<uvec3>> refractWays;
 
 			//指定された結果を指定されたストレージへ送信する 転送したあとはRezはクリアされます
 			const auto TransRezToStorage = [&](std::list<arrow3>& rezOfSt, ofstream& storageofStPtr) {
@@ -619,8 +625,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				accuracyOfSearchNodelenses searchAccuracyOfTheScene;
 
 				//各ピクセルから飛び出るレイと回転角度rdの球との当たり判定を行う
-				for (std::decay<decltype(hardwareParams::projectorResInTheta)>::type vpd = 0; vpd < hardwareParams::projectorResInTheta; vpd++) {//プロジェクタの注目画素ごとに
-					for (std::decay<decltype(hardwareParams::projectorResInPhi)>::type hpd = 0; hpd < hardwareParams::projectorResInPhi; hpd++) {
+				for (std::decay<decltype(hardwareParams::projectorResInTheta)>::type vpd = hardwareParams::projectorResInTheta/2; vpd < hardwareParams::projectorResInTheta; vpd++) {//プロジェクタの注目画素ごとに
+					for (std::decay<decltype(hardwareParams::projectorResInPhi)>::type hpd = hardwareParams::projectorResInPhi/2; hpd < hardwareParams::projectorResInPhi; hpd++) {
 
 						const uvec3 rayDirInGlobal = GetRayDirFromProjectorPix(ivec2(hpd, vpd));
 						const arrow3 rayArrowInBalllocal(uvec3::Zero(), GlobalToBallLocal.prograte() * rayDirInGlobal);//ローカルで表したレイ
@@ -651,6 +657,13 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								//これをグローバルに戻す
 								const arrow3 refractRayDirInGlobal(GlobalToBallLocal.untiprograte() * refractedInBalllocal.value().org(), GlobalToBallLocal.untiprograte() * refractedInBalllocal.value().dir());
 
+								//プロットしましょう
+								//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,mode=\"arrow\")", refractRayDirInGlobal.org().x(), refractRayDirInGlobal.org().y(), refractRayDirInGlobal.org().z(),refractRayDirInGlobal.dir().x(), refractRayDirInGlobal.dir().y(), refractRayDirInGlobal.dir().z());
+								//cout << "a" << endl;
+								PlotRayInMlab(refractRayDirInGlobal,"color = (0, 0, 1), tube_radius = 0.01");
+								refractWays.GetAndLock()->push_back(refractRayDirInGlobal.dir());
+								refractWays.unlock();
+
 								//結果を追加
 								rezMem.push_back(refractRayDirInGlobal);
 
@@ -662,7 +675,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								//}
 							}
 						}
+
+						break;
 					}
+					break;
 				}
 
 				//スキャンが終わったらセーブ
@@ -705,6 +721,18 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					scanThreads.at(th).release();
 				}
 			}
+
+			//さいごに有効角度を計算する
+			const auto& refptr = refractWays.GetAndLock();
+			ureal maxangle = 0.;
+			for(const auto& a:*refptr)
+				for (const auto& b : *refptr) {
+					//角度を計算
+					const auto nowangle = fabs(acos(a.dot(b)));
+					maxangle = max(maxangle, nowangle);
+				}
+
+			cout <<"MAX: " << maxangle*180./pi<<" deg" << endl;
 		};
 
 
@@ -712,7 +740,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//デベロップセクション
-		constexpr bool developImage = true;
+		constexpr bool developImage = false;
 		constexpr bool printMessagesInDevelopping = developImage && false;//デベロップ中のメッセージを出力するか
 		if (developImage) {
 			projRefraDicHeader header;
