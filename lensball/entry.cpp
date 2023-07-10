@@ -522,7 +522,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					//レンズの半径を全反射が生じないようなサイズにして解く
 					const ureal lensRadius=[&]{
 
-						return 1.1 * (2. * lensballDesignParams::lensEdgeWidth / sqrt(3.)) * fabs(cos(localcenterInBalllocalPolar.y()));
+						return (2. * lensballDesignParams::lensEdgeWidth / sqrt(3.)) * fabs(cos(localcenterInBalllocalPolar.y()));
 						const ureal lensWidthCrossHalfInMapD = lensballDesignParams::lensEdgeWidth * (2. / sqrt_constexpr(3.));//マップでのレンズの対角幅の半分
 						lensballDesignParams::hexverticesNodelensOuter;
 						const uvec2 lensWidthHalfVecInMap = lensballDesignParams::DesignedMapToMap.prograte() * uvec2(0., lensWidthCrossHalfInMapD);//Map上でのレンズの対角ベクトルの半分
@@ -530,7 +530,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 						//最終的にθ方向の拡がり角が分かればOK
 						const ureal lensWidthInTheta = acos(PolarToXyz(MapToLocalPolar(localcenterInMap + lensWidthHalfVecInMap)).dot(PolarToXyz(MapToLocalPolar(localcenterInMap - lensWidthHalfVecInMap))));//レンズの上から下を引いたらbシータの角度差のはず
-						const ureal lensWidthGenLength = 2. * lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta / 2.);//そいつの弦の長さ
+						const ureal lensWidthGenLength = 2.*lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta/2.);//そいつの弦の長さ
 						return lensWidthGenLength;
 
 
@@ -548,7 +548,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					int a = 0;
 
 					//要素レンズを描画していく
-					if (drawNodelenses || drawNodelensEdges) {
+					if ((drawNodelenses || drawNodelensEdges)&&ld==0) {
 
 						//つぎに極座標で要素レンズを計算する
 						ResetPyVecSeries(nlensSeries);//ノードレンズ
@@ -662,7 +662,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								//プロットしましょう
 								//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f,mode=\"arrow\")", refractRayDirInGlobal.org().x(), refractRayDirInGlobal.org().y(), refractRayDirInGlobal.org().z(),refractRayDirInGlobal.dir().x(), refractRayDirInGlobal.dir().y(), refractRayDirInGlobal.dir().z());
 								//cout << "a" << endl;
-								PlotRayInMlab(refractRayDirInGlobal,"color = (0, 0, 1), tube_radius = 0.01");
+								//PlotRayInMlab(refractRayDirInGlobal,"color = (0, 0, 1), tube_radius = 0.01");
 								refractWays.GetAndLock()->push_back(refractRayDirInGlobal.dir());
 								refractWays.unlock();
 
@@ -733,7 +733,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					const auto nowangle = fabs(acos(a.dot(b)));
 					maxangle = max(maxangle, nowangle);
 				}
-
+			refractWays.unlock();
 			cout <<"MAX: " << maxangle*180./pi<<" deg" << endl;
 		};
 
