@@ -407,6 +407,18 @@ ureal GetRotationAngleFromRd(const ureal rd) {
 	return uleap({ 0.,2. * pi }, rd / (ureal)(hardwareParams::numOfProjectionPerACycle));
 }
 
+//‚ ‚éƒŒƒC‚ğƒ{[ƒ‹‚É’Ê‰ß‚³‚¹‚½‚Æ‚«‚ÌŠg‚ª‚èŠp‚©‚ç•\¦ƒGƒŠƒA‚Ì”¼Œa‚ğ‚à‚Æ‚ß‚é
+ureal SolveVisibleAreaRadiusFromRefractAngle(const ureal ang) {
+	//‚±‚ÌŠp“x‚ğæ‚Á‚½‚Æ‚«‚ÌŒX‚«
+	const auto slope = tan(ang / 2.);
+	//‚±‚Ì‚Æ‚«‚Ì”¼Œa‚ğÅ¬‚Æ‚·‚éx
+	const auto minx = -pow(slope, 2) / (1. + pow(slope, 2));
+	//‚±‚Ì‚Æ‚«‚Ìy
+	const auto miny = slope * minx + slope;
+
+	return sqrt(pow(minx, 2) + pow(miny, 2));
+};
+
 int main(int argc, char* argv[]) {
 
 	try {
@@ -734,7 +746,16 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					maxangle = max(maxangle, nowangle);
 				}
 			refractWays.unlock();
-			cout <<"MAX: " << maxangle*180./pi<<" deg" << endl;
+			//‚Â‚¬‚ÉÅ¬Šp“x‚ğ‹‚ß‚é@˜ZŠpŒ`‚È‚Ì‚ÅŒÇ‚Ì’·‚³‚ªsqrt(3)/2‚É‚È‚é‚æ‚¤‚ÈŠp“x
+			const ureal minangle = [&] {
+				const auto gen = 2. * sin(maxangle / 2.);//Œ³‚Ì’·‚³
+				const auto mingen = gen * (sqrt(3.) / 2.);//’Z‚¢‚â‚Â‚ÌŒ³‚Ì’·‚³
+				return 2. * asin(0.5 * mingen);
+			}();
+
+			//Šg‚ª‚èŠp‚Ævisible area radius‚ğ•\¦
+			cout <<"MAX ANG: " << maxangle*180./pi<<" deg\tMIN ANG: " << minangle * 180. / pi<<endl;
+			cout << "MAX RAD: " << SolveVisibleAreaRadiusFromRefractAngle(maxangle) << "\tMIN RAD: " << SolveVisibleAreaRadiusFromRefractAngle(minangle) << endl;
 		};
 
 
