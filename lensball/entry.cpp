@@ -514,24 +514,24 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 					//lonn方向の現在位置
 					const ureal tlonn = GetLongitudeInMapDFromLensIndexAndRowFlag(ld, eachFlag);
-					const auto localcenterInMapDesigned = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
-					const auto localcenterInMap = lensballDesignParams::DesignedMapToMap.prograte() * localcenterInMapDesigned;
-					const auto localcenterInBalllocalPolar = MapToLocalPolar(localcenterInMap);
+					const uvec2 localcenterInMapDesigned = uvec2(tlonn, tlati);//要素レンズの中央 ローカルマップ座標
+					const uvec2 localcenterInMap = lensballDesignParams::DesignedMapToMap.prograte() * localcenterInMapDesigned;
+					const uvec2 localcenterInBalllocalPolar = MapToLocalPolar(localcenterInMap);
 					const uvec3 localcenterInBalllocal = PolarToXyz(localcenterInBalllocalPolar);
 
 					//レンズの半径を全反射が生じないようなサイズにして解く
 					const ureal lensRadius=[&]{
 
-						return (2. * lensballDesignParams::lensEdgeWidth / sqrt(3.)) * fabs(cos(localcenterInBalllocalPolar.y()));
-						const ureal lensWidthCrossHalfInMapD = lensballDesignParams::lensEdgeWidth * (2. / sqrt_constexpr(3.));//マップでのレンズの対角幅の半分
-						lensballDesignParams::hexverticesNodelensOuter;
-						const uvec2 lensWidthHalfVecInMap = lensballDesignParams::DesignedMapToMap.prograte() * uvec2(0., lensWidthCrossHalfInMapD);//Map上でのレンズの対角ベクトルの半分
+						//return (2. * lensballDesignParams::lensEdgeWidth / sqrt(3.)) * fabs(cos(localcenterInBalllocalPolar.y()));
+						const ureal lensWidthCrossHalfInMap = lensballDesignParams::lensEdgeWidth * (2. / sqrt(3.));//マップでのレンズの対角幅の半分
+						const uvec2 lensWidthHalfVecInMapD = uvec2(lensWidthCrossHalfInMap, 0.);//Map上でのレンズの対角ベクトルの半分
 
 
 						//最終的にθ方向の拡がり角が分かればOK
-						const ureal lensWidthInTheta = acos(PolarToXyz(MapToLocalPolar(localcenterInMap + lensWidthHalfVecInMap)).dot(PolarToXyz(MapToLocalPolar(localcenterInMap - lensWidthHalfVecInMap))));//レンズの上から下を引いたらbシータの角度差のはず
+						const ureal lensWidthInTheta = acos(PolarToXyz(MapToLocalPolar(localcenterInMap + lensWidthHalfVecInMapD)).dot(PolarToXyz(MapToLocalPolar(localcenterInMap - lensWidthHalfVecInMapD))));//レンズの上から下を引いたらbシータの角度差のはず
 						const ureal lensWidthGenLength = 2.*lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta/2.);//そいつの弦の長さ
-						return lensWidthGenLength;
+						const ureal lensWidthKoLength = lensballDesignParams::lensballParamInner.second * lensWidthInTheta;//そいつの孤の長さ
+						return lensWidthGenLength /2.;
 
 
 						//つぎに全反射角を決めたい
@@ -539,7 +539,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 						//頑張って解くと半径がこのように求まるらしい
 						const ureal dammyRadius = lensWidthGenLength / (2. * sin(rinkaiAngle - lensWidthInTheta / 2.))*1.;
-						return dammyRadius;
+						//return dammyRadius;
 					}();
 
 					//パラメータを登録
@@ -559,7 +559,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								const uvec2 localpos(uleap(PairMinusPlus(pi), nllo / (ureal)(lensballDesignParams::nodeLensResolution.first - 1)),
 									uleap(PairMinusPlus(pi / 2.), nlla / (ureal)(lensballDesignParams::nodeLensResolution.second - 1)));//要素レンズローカルでの極座標
 
-								const uvec3 nodelensShape = (lensRadius * fabs(cos(localcenterInBalllocalPolar.y()))) * PolarToXyz(localpos);//これが球になるはず
+								const uvec3 nodelensShape = (lensRadius * PolarToXyz(localpos));//これが球になるはず
 								AppendPyVecSeries(mlabSeries, nodelensShape + localcenterInBalllocal);
 							}
 							if (drawNodelenses)py::s("nlx.append(mlabvx)\nnly.append(mlabvy)\nnlz.append(mlabvz)\n");//これでメッシュになると思うんやけど
