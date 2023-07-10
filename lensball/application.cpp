@@ -186,6 +186,42 @@ resultIntersecteSphere IntersectSphere(const arrow3& rayback, const uvec3& c, co
 	}
 }
 
+resultIntersecteSphere __IntersectSphere_GetFarOne_TEMPORARYONE(const arrow3& rayback, const uvec3& c, const ureal r) {
+	constexpr ureal crossThreshold = 0.01;
+
+	//各こうを計算する
+	ureal A = 0., B = 0., C = -pow(r, 2);
+	for (int i = 0; i < 3; i++) {
+		A += pow(rayback.dir()[i], 2);
+		B += 2. * rayback.org()[i] * rayback.dir()[i] - 2. * rayback.dir()[i] * c[i];
+		C += pow(rayback.org()[i], 2) - 2. * rayback.org()[i] * c[i] + pow(c[i], 2);
+	}
+	//判別式
+	const ureal hanbetu = pow(B, 2) - 4 * A * C;
+
+	//交差したら
+	if (hanbetu >= 0.) {
+		//交差時間を求める
+		const ureal t0 = (-B + sqrt(hanbetu)) / (2. * A);
+		const ureal t1 = (-B - sqrt(hanbetu)) / (2. * A);
+
+		//最小の交差時間を求める　ただし小さすぎたら無効
+		ureal t = std::max(t0, t1);//マイナスも含めてね
+		if (t <= crossThreshold)throw std::logic_error("DAMEW!!!!");
+
+		//交差点を求める
+		const uvec3 kai = rayback.dir() * t + rayback.org();
+		//交点の法線を求める
+		const uvec3 norm = (kai - c).normalized();
+
+		return resultIntersecteSphere(kai, norm, t);
+	}
+	//交差しなかったら
+	else {
+		return resultIntersecteSphere();
+	}
+}
+
 resultIntersecteSphere::resultIntersecteSphere() {
 	this->isHit = false;
 }

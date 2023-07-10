@@ -143,6 +143,7 @@ struct resultIntersecteSphere {
 	ray3& ApplyToRay(ray3& target)const;
 };
 resultIntersecteSphere IntersectSphere(const arrow3& rayback, const uvec3& c, const ureal r);
+resultIntersecteSphere __IntersectSphere_GetFarOne_TEMPORARYONE(const arrow3& rayback, const uvec3& c, const ureal r);
 
 //‹¾–Ê”½ŽË‚·‚é
 ray3& ReflectMirror(ray3& target, const uvec3& norm);
