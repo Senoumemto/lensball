@@ -557,3 +557,32 @@ bool NaihouHanteiX(const uvec2& p, const std::list<uvec2>& vs) {
 	//x/ycount‚Í‚»‚ê‚¼‚ê‚Ì•ûŒü‚Éü•ª‚ğL‚Î‚µ‚½‚Æ‚«‚ÉŒğ·‚µ‚½‰ñ”
 	return xcount % 2 && ycount % 2;
 }
+
+std::optional<ureal> IntersectArrowAndElipsoid(const arrow3& ray, const uvec3& radius) {
+	constexpr ureal thresiholdZero = 1.e-5;
+
+	//˜A—§•û’ö®‚ğ‰ğ‚¯‚Î‚¢‚¢‚©‚ç
+	ureal a = 0., b = 0., c = -1.;
+	for (size_t i = 0; i < 3; i++) {
+		a += pow(ray.dir()[i], 2) / pow(radius[i], 2);
+		b += 2. * (ray.dir()[i] * ray.org()[i]) / pow(radius[i], 2);
+		c += pow(ray.org()[i], 2) / pow(radius[i], 2);
+	}
+
+	//”»•Ê®
+	const ureal hanbetsu = pow(b, 2) - 4 * a * c;
+
+	//‰ğ‚È‚µ
+	if (hanbetsu < 0.) {
+		return std::nullopt;
+	}
+	//À”‰ğ
+	else {
+		const std::array<ureal, 2> ts = { (-b + sqrt(hanbetsu)) / (2 * a),(-b - sqrt(hanbetsu)) / (2 * a) };
+		//‚Ó‚³‚í‚µ‚¢‚Ì‚Íƒ[ƒˆÈ‰º‚Å‚Í‚È‚¢Å‚à¬‚³‚È’l
+		if (ts.at(0) > 0. && ts.at(1) > 0.)return std::min(ts.at(0), ts.at(1));
+		else if (ts.at(0) * ts.at(1) > 0.)return std::nullopt;
+		else if (ts.at(0) < 0.)return ts.at(1);
+		else return ts.at(0);
+	}
+}

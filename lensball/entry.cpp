@@ -14,6 +14,8 @@ const std::string branchpath = "ExLens/";//このbranchの結果を格納するフォルダ
 
 using py = pythonRuntime;
 
+std::pair<ureal, ureal> GetNodelensRadiusInDobuleface(const uvec2& localcenterInMap);
+
 //ハードウェアのスペック
 namespace hardwareParams {
 	//ハードウェアスペック
@@ -36,7 +38,6 @@ namespace lensballDesignParams {
 
 	constexpr ureal sphereRadiusInner = 1.;//レンズボール内径の直径
 	const sphereParam lensballParamInner(uvec3::Zero(), sphereRadiusInner);//レンズボールのパラメータ
-	const sphereParam lensballParamOuter(uvec3::Zero(), sphereRadiusInner);//レンズボールのパラメータ
 	
 	constexpr size_t lensNumInARow = hardwareParams::verticalDirectionResolution;//一行あたりの行の数
 
@@ -58,8 +59,16 @@ namespace lensballDesignParams {
 		return hexvjunk;
 	}();
 
-
 	constexpr ureal nodelensEta = 1.2;//ノードレンズの比屈折率
+
+	//レンズボールの概形を楕円体近似する
+	//そのために半径を知りたいX,Y半径は一緒、多分赤道上のレンズ半径で決まる
+	//z上の半径は1になるんじゃないかな
+	const uvec3 lensballApproximateShapeElipsoid = [&] {
+		const ureal outerRadiusInEquater = GetNodelensRadiusInDobuleface(uvec2::Zero()).second;//赤道でのレンズボール外側半径を求める
+		const ureal radiusXY = lensballDesignParams::sphereRadiusInner + outerRadiusInEquater;//こんだけ膨張する
+		return uvec3(radiusXY, radiusXY, 1.); }();
+
 };
 //現像時のパラメータ
 namespace developperParams {
@@ -70,8 +79,8 @@ namespace developperParams {
 
 		return hexvjunk;
 	}();//外接円の半径が1になるような六角形
-	constexpr size_t searchAreaInALen = 9;//同じ行のレンズをどれだけ深追いして検索するか
-	constexpr size_t searchAreaInARow = 9;//列をどれだけ深追いして検索するか
+	constexpr size_t searchAreaInALen = 6;// lensballDesignParams::lensNumInARow;//同じ行のレンズをどれだけ深追いして検索するか
+	constexpr size_t searchAreaInARow = 7;// lensballDesignParams::rowNum;//列をどれだけ深追いして検索するか
 	//あたりを付けたノードレンズから探索する範囲
 	//まずヘッダを読み出す
 	const std::string framePrefixX = "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
@@ -222,6 +231,50 @@ public:
 	accuracyOfSearchNodelenses() :super(0, 0){}
 };
 
+
+//内側曲率半径と外側曲率半径をレンズ位置から求める
+std::pair<ureal, ureal> GetNodelensRadiusInDobuleface(const uvec2& localcenterInMap) {
+
+	//return (2. * lensballDesignParams::lensEdgeWidth / sqrt(3.)) * fabs(cos(localcenterInBalllocalPolar.y()));
+	const ureal lensWidthCrossHalfInMap = lensballDesignParams::lensEdgeWidth * (2. / sqrt(3.));//マップでのレンズの対角幅の半分
+	const uvec2 lensWidthHalfVecInMapD = uvec2(lensWidthCrossHalfInMap, 0.);//Map上でのレンズの対角ベクトルの半分
+
+
+	//最終的にθ方向の拡がり角が分かればOK
+	const ureal lensWidthInTheta = acos(PolarToXyz(MapToLocalPolar(localcenterInMap + lensWidthHalfVecInMapD)).dot(PolarToXyz(MapToLocalPolar(localcenterInMap - lensWidthHalfVecInMapD))));//レンズの上から下を引いたらbシータの角度差のはず
+	const ureal lensWidthGenLength = 2. * lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta / 2.);//そいつの弦の長さ
+	const ureal lensWidthKoLength = lensballDesignParams::lensballParamInner.second * lensWidthInTheta;//そいつの孤の長さ
+	//return lensWidthGenLength /2.;
+	//このサイズを基準としてどれだけ拡大すれば全反射が起きないのか計算する
+
+	//つぎに全反射角を決めたい
+	const ureal rinkaiAngle = asin(1. / lensballDesignParams::nodelensEta);
+	//臨界角がわかると法線がその角度となるときのx座標(半径を1としたときの)がわかる プラス側
+	const ureal xWhereANormisRinkai = (rinkaiAngle * sqrt(pow(rinkaiAngle, 2) + 1.)) / (pow(rinkaiAngle, 2) + 1.);
+	//つまりこれ分の一すればギリギリ端っこで臨界角のはず
+	const ureal radiusInner = lensWidthGenLength / 2. / xWhereANormisRinkai;
+	//外側半径はギリギリ端っこがギリギリ端っこになるような半径
+	const ureal radiusOuter = fabs(lensWidthGenLength) / 2.;
+
+	return make_pair(radiusOuter, radiusOuter);
+}
+
+//elipsoidの交点を球面上に投影する
+resultIntersecteSphere GetHitResultOfSphereFromElipsoidIntersection(const uvec3& elipsoidRadius,const std::optional<ureal> intersectRez,const arrow3& ar) {
+	if (!intersectRez) {
+		resultIntersecteSphere rez;
+		rez.isHit = false;
+		return rez;
+	}
+	resultIntersecteSphere rez;
+	rez.isHit = true;
+	rez.t = intersectRez.value();
+	rez.norm = (ar.dir() * rez.t + ar.org()).normalized();
+	rez.pos = rez.norm * lensballDesignParams::sphereRadiusInner;
+
+	return rez;
+}
+
 //要素レンズを検索する 内側からか外側からかで振る舞いが変わります 	
 optional<std::pair<resultSearchNodeLens, accuracyOfSearchNodelenses>> SearchNodeLensHitByARayInBalllocalX(const arrow3& targetInBalllocal, const resultIntersecteSphere& hitRezVsSphere, const nodeLensDic& nodelensParamsInBalllocal, const size_t searchAreaInARow, const size_t searchAreaInALen,const rayIncidentWay& enterFrom) {
 
@@ -284,8 +337,7 @@ optional<std::pair<resultSearchNodeLens, accuracyOfSearchNodelenses>> SearchNode
 				if (enterFrom == rayIncidentWay::toInner) return IntersectSphere(targetInBalllocal, thislensparamInBalllocal.inSurf().first, thislensparamInBalllocal.inSurf().second);
 				else return IntersectSphere(targetInBalllocal, thislensparamInBalllocal.outSurf().first, thislensparamInBalllocal.outSurf().second);
 			}();
-			//レンズボール概形よりも絶対近い場所のはず これは内側外側問わずね
-			if (hitRezVsANode.isHit && hitRezVsANode.t < hitRezVsSphere.t) {
+			if(hitRezVsANode.isHit)
 				//やっぱり一番近いレンズを見つけておわり
 				if (hitRezVsANode.t < closestT) {
 					hitlensParamInBalllocal = make_pair(make_pair(thislensparamInBalllocal, hitRezVsANode), make_pair(rilini, lidlini));
@@ -294,7 +346,6 @@ optional<std::pair<resultSearchNodeLens, accuracyOfSearchNodelenses>> SearchNode
 						int ad = 0;
 					closestT = hitRezVsANode.t;
 				}
-			}
 		}
 
 	}
@@ -438,6 +489,7 @@ ureal SolveVisibleAreaRadiusFromRefractAngle(const ureal ang) {
 	return sqrt(pow(minx, 2) + pow(miny, 2));
 };
 
+
 int main(int argc, char* argv[]) {
 
 	try {
@@ -551,31 +603,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					const uvec3 localcenterInBalllocal = PolarToXyz(localcenterInBalllocalPolar);
 
 					//レンズの半径を全反射が生じないようなサイズにして解く
-					const std::pair<ureal,ureal> lensRadiusDoubleface=[&]{
-
-						//return (2. * lensballDesignParams::lensEdgeWidth / sqrt(3.)) * fabs(cos(localcenterInBalllocalPolar.y()));
-						const ureal lensWidthCrossHalfInMap = lensballDesignParams::lensEdgeWidth * (2. / sqrt(3.));//マップでのレンズの対角幅の半分
-						const uvec2 lensWidthHalfVecInMapD = uvec2(lensWidthCrossHalfInMap, 0.);//Map上でのレンズの対角ベクトルの半分
-
-
-						//最終的にθ方向の拡がり角が分かればOK
-						const ureal lensWidthInTheta = acos(PolarToXyz(MapToLocalPolar(localcenterInMap + lensWidthHalfVecInMapD)).dot(PolarToXyz(MapToLocalPolar(localcenterInMap - lensWidthHalfVecInMapD))));//レンズの上から下を引いたらbシータの角度差のはず
-						const ureal lensWidthGenLength = 2.*lensballDesignParams::lensballParamInner.second * sin(lensWidthInTheta/2.);//そいつの弦の長さ
-						const ureal lensWidthKoLength = lensballDesignParams::lensballParamInner.second * lensWidthInTheta;//そいつの孤の長さ
-						//return lensWidthGenLength /2.;
-						//このサイズを基準としてどれだけ拡大すれば全反射が起きないのか計算する
-
-						//つぎに全反射角を決めたい
-						const ureal rinkaiAngle = asin(1. / lensballDesignParams::nodelensEta);
-						//臨界角がわかると法線がその角度となるときのx座標(半径を1としたときの)がわかる プラス側
-						const ureal xWhereANormisRinkai = (rinkaiAngle * sqrt(pow(rinkaiAngle, 2) + 1.)) / (pow(rinkaiAngle, 2) + 1.);
-						//つまりこれ分の一すればギリギリ端っこで臨界角のはず
-						const ureal radiusInner = lensWidthGenLength / 2. / xWhereANormisRinkai;
-						//外側半径はギリギリ端っこがギリギリ端っこになるような半径
-						const ureal radiusOuter = fabs(lensWidthGenLength) / 2.;
-
-						return make_pair(radiusOuter, radiusOuter);
-					}();
+					const std::pair<ureal, ureal> lensRadiusDoubleface = GetNodelensRadiusInDobuleface(localcenterInMap);
 
 					//パラメータを登録
 					nodelensParamsFrontBackRez[make_pair(rd, ld)].operator=(make_pair(sphereParam(localcenterInBalllocal, lensRadiusDoubleface.first), sphereParam(localcenterInBalllocal, lensRadiusDoubleface.second)));
@@ -884,13 +912,13 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					const auto GetColorOfCamPix = [&](const decltype(cameraRayList)::const_iterator cameraRayIte, const ivec2& pixOfCam) {//レイを特定してローカルを計算
 						const arrow3 targetInBalllocal(GlobalToBallLocal.prograte() * (*cameraRayIte).org(), GlobalToBallLocal.prograte() * (*cameraRayIte).dir());
 						//このレイがレンズボールに当たるか
-						const auto hitRezVsSphere = IntersectSphere(targetInBalllocal, lensballDesignParams::lensballParamOuter.first, lensballDesignParams::lensballParamOuter.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
-
+						//const auto hitRezVsSphereX = IntersectSphere(targetInBalllocal, lensballDesignParams::lensballParamInner.first, lensballDesignParams::lensballParamInner.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
+						const auto hitRezVsElipsoid = IntersectArrowAndElipsoid(targetInBalllocal, lensballDesignParams::lensballApproximateShapeElipsoid);
+						const auto hitRezVsSphere = GetHitResultOfSphereFromElipsoidIntersection(lensballDesignParams::lensballApproximateShapeElipsoid, hitRezVsElipsoid, targetInBalllocal);
 						if (hitRezVsSphere.isHit) {
-
 							//このレイが要素レンズに当たるか検索する　もちろんローカル座標系での話
 							const auto hitlensParamInBalllocal = SearchNodeLensHitByARayInBalllocalX(targetInBalllocal, hitRezVsSphere, nodelensParamsFrontBackInBalllocal.value(), developperParams::searchAreaInARow, developperParams::searchAreaInALen, rayIncidentWay::toOuter);//カメラは外側!
-
+							
 							if (hitlensParamInBalllocal) {//要素レンズに当たったら
 								//accuracyを更新
 								searchAccuracyOfTheScene.UpdateThisToWorth(hitlensParamInBalllocal.value().second);

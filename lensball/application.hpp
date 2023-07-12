@@ -323,3 +323,4 @@ size_t GetBisideIndex(size_t lini, size_t center, int way, const size_t indSiz);
 //ƒŒƒC‚ð–_‚Å•`‰æ‚·‚é
 void PlotRayInMlab(const arrow3& ray, const std::string& prefix);
 
+std::optional<ureal> IntersectArrowAndElipsoid(const arrow3& ray, const uvec3& radius);
