@@ -70,8 +70,8 @@ namespace developperParams {
 
 		return hexvjunk;
 	}();//外接円の半径が1になるような六角形
-	constexpr size_t searchAreaInALen = 8;//同じ行のレンズをどれだけ深追いして検索するか
-	constexpr size_t searchAreaInARow = 8;//列をどれだけ深追いして検索するか
+	constexpr size_t searchAreaInALen = 9;//同じ行のレンズをどれだけ深追いして検索するか
+	constexpr size_t searchAreaInARow = 9;//列をどれだけ深追いして検索するか
 	//あたりを付けたノードレンズから探索する範囲
 	//まずヘッダを読み出す
 	const std::string framePrefixX = "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
@@ -84,10 +84,10 @@ namespace developperParams {
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
 	constexpr size_t antialiasInH = 1;//y方向にこれだけサンプルしてから縮小する
-	constexpr size_t cameraResW = 1024, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
+	constexpr size_t cameraResW = 64, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
 	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
 
-	constexpr size_t subStepRes=10;//より細かくボールを回す
+	constexpr size_t subStepRes=1;//より細かくボールを回す
 
 	auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(0. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
 };
@@ -574,7 +574,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 						//外側半径はギリギリ端っこがギリギリ端っこになるような半径
 						const ureal radiusOuter = fabs(lensWidthGenLength) / 2.;
 
-						return make_pair(radiusInner, radiusOuter);
+						return make_pair(radiusOuter, radiusOuter);
 					}();
 
 					//パラメータを登録
@@ -900,30 +900,30 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								if (refractedRay) {
 									const arrow3 refractedArrowInGlobal(GlobalToBallLocal.untiprograte() * refractedRay.value().org(), GlobalToBallLocal.untiprograte() * refractedRay.value().dir());//レイの向きを戻す
 
-//つぎにプロジェクターのどの画素に当たるかを解く
-//まず開口に当たるかい
-if (!ThroughAperture(refractedArrowInGlobal)) {
-	//プロジェクタには入社しなかった
-	//if (rdx % (int)(developperParams::subStepRes*2.24) == 2)PlotRayInMlab(refractedArrowInGlobal,"color=(0,0,1), tube_radius=0.01");
+									//つぎにプロジェクターのどの画素に当たるかを解く
+									//まず開口に当たるかい
+									if (!ThroughAperture(refractedArrowInGlobal)) {
+										//プロジェクタには入社しなかった
+										//if (rdx % (int)(developperParams::subStepRes*2.24) == 2)PlotRayInMlab(refractedArrowInGlobal,"color=(0,0,1), tube_radius=0.01");
 
-	if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
-	return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
-}
+										if (printMessagesInDevelopping)cout << "プロジェクタには入射しなかった" << endl;
+										return (std::optional<uvec3>)(std::nullopt);//このシーンではだめだったので次のレイ
+									}
 
-//開口にあたったらレイの向きで画素を判断できる
-const auto pixpos = GetPixPosFromEnteredRay(refractedArrowInGlobal.dir());
-//アパーチャに入ったら違う色で描画してやる
-//PlotRayInMlab(refractedArrowInGlobal, "color=(1,0,1), tube_radius=0.01");
+									//開口にあたったらレイの向きで画素を判断できる
+									const auto pixpos = GetPixPosFromEnteredRay(refractedArrowInGlobal.dir());
+									//アパーチャに入ったら違う色で描画してやる
+									//PlotRayInMlab(refractedArrowInGlobal, "color=(1,0,1), tube_radius=0.01");
 
-//無効な座標でなければリストに入れる
-if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
-	const auto pixColor = thisFrame.get()->data.at(pixpos.y()).at(pixpos.x());//フレームから色を取り出す
-	//cout << "rez: " << pixpos.x() << "\t" << pixpos.y() << "\t";
-	return std::optional<uvec3>(uvec3(pixColor.r, pixColor.g, pixColor.b));
-}
-else {
-	//cout << "invalid: " << pixpos.x() << "\t" << pixpos.y() << "\t";
-}
+									//無効な座標でなければリストに入れる
+									if (pixpos.x() >= 0 && pixpos.x() < hardwareParams::projectorResInPhi && pixpos.y() >= 0 && pixpos.y() < hardwareParams::projectorResInTheta) {
+										const auto pixColor = thisFrame.get()->data.at(pixpos.y()).at(pixpos.x());//フレームから色を取り出す
+										//cout << "rez: " << pixpos.x() << "\t" << pixpos.y() << "\t";
+										return std::optional<uvec3>(uvec3(pixColor.r, pixColor.g, pixColor.b));
+									}
+									else {
+										//cout << "invalid: " << pixpos.x() << "\t" << pixpos.y() << "\t";
+									}
 								}
 							}
 
