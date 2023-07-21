@@ -79,8 +79,8 @@ namespace developperParams {
 
 		return hexvjunk;
 	}();//外接円の半径が1になるような六角形
-	constexpr size_t searchAreaInALen = 6;// lensballDesignParams::lensNumInARow;//同じ行のレンズをどれだけ深追いして検索するか
-	constexpr size_t searchAreaInARow = 7;// lensballDesignParams::rowNum;//列をどれだけ深追いして検索するか
+	constexpr size_t searchAreaInALen = 5;// lensballDesignParams::lensNumInARow;//同じ行のレンズをどれだけ深追いして検索するか
+	constexpr size_t searchAreaInARow =6;// lensballDesignParams::rowNum;//列をどれだけ深追いして検索するか
 	//あたりを付けたノードレンズから探索する範囲
 	//まずヘッダを読み出す
 	const std::string framePrefixX = "frames\\frame";//フレームを格納しているフォルダのprefix <prefix><id>.bmpみたいな名前にしてね
@@ -93,7 +93,7 @@ namespace developperParams {
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
 	constexpr size_t antialiasInH = 1;//y方向にこれだけサンプルしてから縮小する
-	constexpr size_t cameraResW = 64, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
+	constexpr size_t cameraResW = 1024, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
 	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
 
 	constexpr size_t subStepRes=1;//より細かくボールを回す
@@ -575,7 +575,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 		//レンズアレイを作成、描画する
 		//六角形でタイリングする　偶数行を書いてから奇数行を書くって感じ
 		constexpr bool calcNodelenses = true;//ノードレンズの位置を計算してレンズボールを形成する
-		constexpr bool drawNodelenses = calcNodelenses & false;//要素レンズを描画する
+		constexpr bool drawNodelenses = calcNodelenses & true;//要素レンズを描画する
 		constexpr bool drawNodelensEdges = calcNodelenses & false;//ノードレンズの枠線を描画する
 
 		//この計算で要素レンズリストがわかるよ
@@ -591,7 +591,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				const bool eachFlag = rd % 2;//交互に切り替わるフラグ
 				for (std::decay<decltype(lensballDesignParams::lensNumInARow)>::type ld = 0; ld < lensballDesignParams::lensNumInARow; ld++) {
 
-					auto color = HsvToRgb({ uleap({0.,1.},ld / (ureal)lensballDesignParams::lensNumInARow),1.,1. });//色を行方向に変える
 					//六角形を収めるバッファをクリア
 					ResetPyVecSeries(pypltSeries);
 
@@ -608,10 +607,10 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					//パラメータを登録
 					nodelensParamsFrontBackRez[make_pair(rd, ld)].operator=(make_pair(sphereParam(localcenterInBalllocal, lensRadiusDoubleface.first), sphereParam(localcenterInBalllocal, lensRadiusDoubleface.second)));
 
-					int a = 0;
-
 					//要素レンズを描画していく
 					if ((drawNodelenses || drawNodelensEdges)) {
+						const auto colorFactor=uleap(make_pair<ureal, ureal>(0., 1.), (ureal)(rd* lensballDesignParams::lensNumInARow + ld) / (ureal)(lensballDesignParams::rowNum * lensballDesignParams::lensNumInARow));
+						const auto color = HsvToRgb({ colorFactor,1.,1. });//色を螺旋に変える
 
 						//つぎに極座標で要素レンズを計算する
 						ResetPyVecSeries(nlensSeries);//ノードレンズ
@@ -841,7 +840,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//デベロップセクション
-		constexpr bool developImage = true;
+		constexpr bool developImage = false;
 		constexpr bool printMessagesInDevelopping = developImage && false;//デベロップ中のメッセージを出力するか
 		if (developImage) {
 			projRefraDicHeader header;
@@ -912,7 +911,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					const auto GetColorOfCamPix = [&](const decltype(cameraRayList)::const_iterator cameraRayIte, const ivec2& pixOfCam) {//レイを特定してローカルを計算
 						const arrow3 targetInBalllocal(GlobalToBallLocal.prograte() * (*cameraRayIte).org(), GlobalToBallLocal.prograte() * (*cameraRayIte).dir());
 						//このレイがレンズボールに当たるか
-						//const auto hitRezVsSphereX = IntersectSphere(targetInBalllocal, lensballDesignParams::lensballParamInner.first, lensballDesignParams::lensballParamInner.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
+						//const auto hitRezVsSphere = IntersectSphere(targetInBalllocal, lensballDesignParams::lensballParamInner.first, lensballDesignParams::lensballParamInner.second);//レイの大まかな着弾点を計算するSphereのどこに当たりますか
 						const auto hitRezVsElipsoid = IntersectArrowAndElipsoid(targetInBalllocal, lensballDesignParams::lensballApproximateShapeElipsoid);
 						const auto hitRezVsSphere = GetHitResultOfSphereFromElipsoidIntersection(lensballDesignParams::lensballApproximateShapeElipsoid, hitRezVsElipsoid, targetInBalllocal);
 						if (hitRezVsSphere.isHit) {
@@ -1036,7 +1035,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//表示する 3d 2dの順
-		//py::s("mlab.show()");
+		py::s("mlab.show()");
 		py::s("plt.show()");
 
 		const auto endTimePoint = std::chrono::system_clock::now();
