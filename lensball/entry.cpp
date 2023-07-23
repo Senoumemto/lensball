@@ -16,6 +16,7 @@ using py = pythonRuntime;
 
 std::pair<ureal, ureal> GetNodelensRadiusInDobuleface(const uvec2& localcenterInMap);
 
+
 //ハードウェアのスペック
 namespace hardwareParams {
 	//ハードウェアスペック
@@ -59,7 +60,7 @@ namespace lensballDesignParams {
 		return hexvjunk;
 	}();
 
-	constexpr ureal nodelensEta = 1.2;//ノードレンズの比屈折率
+	constexpr ureal nodelensEta = 1.5;//ノードレンズの比屈折率
 
 	//レンズボールの概形を楕円体近似する
 	//そのために半径を知りたいX,Y半径は一緒、多分赤道上のレンズ半径で決まる
@@ -93,10 +94,10 @@ namespace developperParams {
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
 	constexpr size_t antialiasInH = 1;//y方向にこれだけサンプルしてから縮小する
-	constexpr size_t cameraResW = 1024, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
+	constexpr size_t cameraResW = 64, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
 	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
 
-	constexpr size_t subStepRes=1;//より細かくボールを回す
+	constexpr size_t subStepRes=10;//より細かくボールを回す
 
 	auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(0. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
 };
@@ -256,7 +257,7 @@ std::pair<ureal, ureal> GetNodelensRadiusInDobuleface(const uvec2& localcenterIn
 	//外側半径はギリギリ端っこがギリギリ端っこになるような半径
 	const ureal radiusOuter = fabs(lensWidthGenLength) / 2.;
 
-	return make_pair(radiusOuter, radiusOuter);
+	return make_pair(radiusInner, radiusOuter);
 }
 
 //elipsoidの交点を球面上に投影する
@@ -411,7 +412,7 @@ std::optional<arrow3> GetRefractedRayWithASphericalLensX(const arrow3& targetInB
 }
 
 //カメラ映像を保存する
-void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList, const std::unordered_map < ivec2, ureal >& colorSiz, const std::string& filename, const bool useTimestamp=true) {
+void WriteBmpOfCamera(const developResult& devRez, const std::string& savepath) {
 
 	bmpLib::img picture;//カメラからの映像
 	picture.width = developperParams::cameraResW;
@@ -429,9 +430,9 @@ void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList, const s
 			picture.data[yy][x] = bmpLib::color(0, 0, 0);
 			maskPic.data[yy][x] = bmpLib::color(0, 0, 0);
 			for (int a = 0; a < developperParams::antialiasInH; a++) {
-				const auto pixIte = colorList.find(ivec2(x, yy * developperParams::antialiasInH + a));
-				const auto sizeIte = colorSiz.find(ivec2(x, yy * developperParams::antialiasInH + a));//対応したピクセルを設置
-				if (pixIte != colorList.cend()) {//ちゃんと色があれば
+				const auto pixIte = devRez.colorList.find(ivec2(x, yy * developperParams::antialiasInH + a));
+				const auto sizeIte = devRez.colorSiz.find(ivec2(x, yy * developperParams::antialiasInH + a));//対応したピクセルを設置
+				if (pixIte != devRez.colorList.cend()) {//ちゃんと色があれば
 					picture.data[yy][x] += bmpLib::color(pixIte->second.x() * (developperParams::brightnessCoef / developperParams::antialiasInH), pixIte->second.y() * (developperParams::brightnessCoef / developperParams::antialiasInH), pixIte->second.z() * (developperParams::brightnessCoef / developperParams::antialiasInH));//そもそもレイが放たれている範囲をうっすら色付け
 					maskPic.data[yy][x] = bmpLib::color(0, clamp<int>(sizeIte->second, 0, 255), 0);
 				}
@@ -439,26 +440,8 @@ void WriteBmpOfCamera(const std::unordered_map<ivec2, uvec3>& colorList, const s
 		}
 	}
 
-	const std::string filenameSufix = [&] {
-		//名前にタイムスタンプをつける
-		if (useTimestamp) {
-			const auto timestampText = [&] {
-				std::chrono::zoned_time zonedTimestamp{ std::chrono::current_zone(), std::chrono::system_clock::now() };
-				auto truncated = std::chrono::time_point_cast<std::chrono::milliseconds>(zonedTimestamp.get_local_time());
-
-
-				stringstream ss;
-				ss << std::format("({:%y%m%d_%H%M%S})", truncated);
-
-				return (std::string)ss.str();
-			}();
-			return timestampText;
-		}
-		else return std::string("");
-	}();
-
-	bmpLib::WriteBmp((rezpath + branchpath + filename + filenameSufix + ".bmp").c_str(), &picture);
-	bmpLib::WriteBmp((rezpath + branchpath + "_mask" + filename + filenameSufix + ".bmp").c_str(), &maskPic);
+	bmpLib::WriteBmp((savepath+".bmp").c_str(), &picture);
+	bmpLib::WriteBmp((savepath+".mask.bmp").c_str(), &maskPic);
 }
 
 //アパーチャ
@@ -554,7 +537,7 @@ int main(int argc, char* argv[]) {
 spx = np.cos(sphphi)*np.sin(sphtheta)
 spy = np.sin(sphphi)*np.sin(sphtheta)
 spz = np.cos(sphtheta)
-mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) ,representation="wireframe" )  
+mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )  
 )", sphereResolution, sphereResolution, lensballDesignParams::sphereRadiusInner, lensballDesignParams::sphereRadiusInner, lensballDesignParams::sphereRadiusInner);
 
 			//アパーチャを球で近似して描画する
@@ -575,7 +558,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 		//レンズアレイを作成、描画する
 		//六角形でタイリングする　偶数行を書いてから奇数行を書くって感じ
 		constexpr bool calcNodelenses = true;//ノードレンズの位置を計算してレンズボールを形成する
-		constexpr bool drawNodelenses = calcNodelenses & true;//要素レンズを描画する
+		constexpr bool drawNodelenses = calcNodelenses & false;//要素レンズを描画する
 		constexpr bool drawNodelensEdges = calcNodelenses & false;//ノードレンズの枠線を描画する
 
 		//この計算で要素レンズリストがわかるよ
@@ -840,7 +823,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//デベロップセクション
-		constexpr bool developImage = false;
+		constexpr bool developImage = true;
 		constexpr bool printMessagesInDevelopping = developImage && false;//デベロップ中のメッセージを出力するか
 		if (developImage) {
 			projRefraDicHeader header;
@@ -869,6 +852,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				std::make_pair(0.,0.), std::make_pair(-15.,0.), std::make_pair(-30.,0.), std::make_pair(-15.,0.),
 				std::make_pair(0.,0.), std::make_pair(0., 15.), std::make_pair(0., 30.), std::make_pair(0., 15.),
 				std::make_pair(0.,0.), std::make_pair(0., -15.), std::make_pair(0., -30.), std::make_pair(0., -15.) */};//Z軸中心の回転角度、Y軸中心の回転角度の順に[deg]で表記する
+
+
 			for (size_t ctd = 0; ctd < cameraTransAngleSets.size();ctd++) {
 				developperParams::cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(cameraTransAngleSets.at(ctd).second / 180. * pi, uvec3::UnitY()) * Eigen::AngleAxis<ureal>(cameraTransAngleSets.at(ctd).first / 180. * pi, uvec3::UnitZ()) * Eigen::Translation<ureal, 3>(uvec3(30., 0., 0.)));//カメラの変換をセットする
 				
@@ -890,10 +875,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 						//py::sf("mlab.plot3d([%f,%f],[%f,%f],[%f,%f],color=(1,0,0))", cameraRayList.back().org().x(), cameraRayList.back().dir().x()*30.+ cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().dir().y()*30.+ cameraRayList.back().org().y(),cameraRayList.back().org().z(), cameraRayList.back().dir().z()*30.+ cameraRayList.back().org().z());
 					}
 				}
-
-				std::mutex colorListMutex;
-				std::unordered_map<ivec2, uvec3> colorList;//カメラの受光素子ごとの色の合計
-				std::unordered_map<ivec2, ureal> colorSiz;//受光素子に何シーン光が入射したか
+				
+				mutexedVariant<developResult> devRez;//デベロップ結果の生画像
 				//あるシーンでのカメラ映像をけいさんする関数
 				const auto GetAFrameOfAScene = [&](const size_t rdx, const decltype(finFlagOfEachDevThread)::iterator finflag) {
 					//この計算での//要素レンズ検索の正確さインジゲータ(最初に当たりをつけた部分からどれだけ離れた位置を検索したか)
@@ -972,15 +955,17 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								if (thiscolor) {
 
 									//cout << "poskey: " << poskey.x() << "\t" << poskey.y() << endl;
-									lock_guard guard(colorListMutex);
+									const auto& devRezVal = devRez.GetAndLock();
 
-									const auto pixIte = colorList.find(poskey);
-									if (pixIte == colorList.cend())colorList[poskey] = uvec3::Zero();
-									colorList[poskey] += thiscolor.value() / developperParams::subStepRes;//各シーンの色を足し合わせてやればいい
+									const auto pixIte = devRezVal->colorList.find(poskey);
+									if (pixIte == devRezVal->colorList.cend())devRezVal->colorList[poskey] = uvec3::Zero();
+									devRezVal->colorList[poskey] += thiscolor.value() / developperParams::subStepRes;//各シーンの色を足し合わせてやればいい
 
-									const auto sizIte = colorSiz.find(poskey);//何フレームでゲットできたかをゲット
-									if (sizIte == colorSiz.cend())colorSiz[poskey] = 0;
-									colorSiz[poskey] += 5.;
+									const auto sizIte = devRezVal->colorSiz.find(poskey);//何フレームでゲットできたかをゲット
+									if (sizIte == devRezVal->colorSiz.cend())devRezVal->colorSiz[poskey] = 0;
+									devRezVal->colorSiz[poskey] += 5.;
+
+									devRez.unlock();
 								}
 								else
 									int a = 0;
@@ -1021,9 +1006,27 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 						devThreads.at(th).release();
 					}
 				}
+				//結果の格納場所を作る
+				const auto filePathWithTimeStamp = rezpath+branchpath+StringFormat("rez%d", ctd)+ [&] {
+					std::chrono::zoned_time zonedTimestamp{ std::chrono::current_zone(), std::chrono::system_clock::now() };
+					auto truncated = std::chrono::time_point_cast<std::chrono::milliseconds>(zonedTimestamp.get_local_time());
 
+					stringstream ss;
+					ss << std::format("({:%y%m%d_%H%M%S})", truncated);
+
+					return (std::string)ss.str();
+				}();
+				//結果をロックして処理する
+				const auto& devRezVal = devRez.GetAndLock();
+				//Rowファイルとして保存する
+				{
+					ofstream ofs(filePathWithTimeStamp +".devrez", std::ios::binary);
+					cereal::BinaryOutputArchive bin(ofs);
+					bin(*devRezVal);
+					devRez.unlock();
+				}
 				//映像をBMPとして書き出す
-				WriteBmpOfCamera(colorList, colorSiz, StringFormat("rez%d", ctd));
+				WriteBmpOfCamera(devRezVal.operator*(), filePathWithTimeStamp);
 			}
 
 			//Accuracyでも表示してみる

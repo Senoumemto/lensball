@@ -13,6 +13,7 @@
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/string.hpp>
 #include <cereal/types/list.hpp>
+#include <cereal/types/unordered_map.hpp>
 
 //plotterの準備関数
 uptr<matplotlib> SetupPythonRuntime();
@@ -324,3 +325,45 @@ size_t GetBisideIndex(size_t lini, size_t center, int way, const size_t indSiz);
 void PlotRayInMlab(const arrow3& ray, const std::string& prefix);
 
 std::optional<ureal> IntersectArrowAndElipsoid(const arrow3& ray, const uvec3& radius);
+
+
+namespace cereal
+{
+	template <class Archive, class Derived> inline
+		typename std::enable_if<traits::is_output_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
+		save(Archive& ar, Eigen::PlainObjectBase<Derived> const& m) {
+		typedef Eigen::PlainObjectBase<Derived> ArrT;
+		if (ArrT::RowsAtCompileTime == Eigen::Dynamic) ar(m.rows());
+		if (ArrT::ColsAtCompileTime == Eigen::Dynamic) ar(m.cols());
+		ar(binary_data(m.data(), m.size() * sizeof(typename Derived::Scalar)));
+	}
+
+	template <class Archive, class Derived> inline
+		typename std::enable_if<traits::is_input_serializable<BinaryData<typename Derived::Scalar>, Archive>::value, void>::type
+		load(Archive& ar, Eigen::PlainObjectBase<Derived>& m) {
+		typedef Eigen::PlainObjectBase<Derived> ArrT;
+		Eigen::Index rows = ArrT::RowsAtCompileTime, cols = ArrT::ColsAtCompileTime;
+		if (rows == Eigen::Dynamic) ar(rows);
+		if (cols == Eigen::Dynamic) ar(cols);
+		m.resize(rows, cols);
+		ar(binary_data(m.data(), static_cast<std::size_t>(rows * cols * sizeof(typename Derived::Scalar))));
+	}
+}
+
+class developResult {
+
+public:
+	std::unordered_map<ivec2, uvec3> colorList;//カメラの受光素子ごとの色の合計
+	std::unordered_map<ivec2, ureal> colorSiz;//受光素子ごとの入射量
+
+
+	//シリアライズできるように
+	template<class Archive> void serialize(Archive& archive) const {
+		archive(colorList);
+		archive(colorSiz);
+	}
+	template<class Archive> void serialize(Archive& archive) {
+		archive(colorList);
+		archive(colorSiz);
+	}
+};
