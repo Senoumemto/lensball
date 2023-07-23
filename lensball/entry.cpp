@@ -3,6 +3,7 @@
 #include "matplotwrapper.hpp"
 #include "general.hpp"
 #include "bmpLib/bmp.hpp"
+#include <random>
 
 using namespace std;
 
@@ -16,6 +17,7 @@ using py = pythonRuntime;
 
 std::pair<ureal, ureal> GetNodelensRadiusInDobuleface(const uvec2& localcenterInMap);
 
+std::mt19937 dice([&] {std::random_device rand; return rand(); }());//いい感じの乱数生成気
 
 //ハードウェアのスペック
 namespace hardwareParams {
@@ -430,9 +432,9 @@ void WriteBmpOfCamera(const developResult& devRez, const std::string& savepath) 
 			picture.data[yy][x] = bmpLib::color(0, 0, 0);
 			maskPic.data[yy][x] = bmpLib::color(0, 0, 0);
 			for (int a = 0; a < developperParams::antialiasInH; a++) {
-				const auto pixIte = devRez.colorList.find(ivec2(x, yy * developperParams::antialiasInH + a));
-				const auto sizeIte = devRez.colorSiz.find(ivec2(x, yy * developperParams::antialiasInH + a));//対応したピクセルを設置
-				if (pixIte != devRez.colorList.cend()) {//ちゃんと色があれば
+				const auto pixIte = devRez.colorSum.find(ivec2(x, yy * developperParams::antialiasInH + a));
+				const auto sizeIte = devRez.colorNum.find(ivec2(x, yy * developperParams::antialiasInH + a));//対応したピクセルを設置
+				if (pixIte != devRez.colorSum.cend()) {//ちゃんと色があれば
 					picture.data[yy][x] += bmpLib::color(pixIte->second.x() * (developperParams::brightnessCoef / developperParams::antialiasInH), pixIte->second.y() * (developperParams::brightnessCoef / developperParams::antialiasInH), pixIte->second.z() * (developperParams::brightnessCoef / developperParams::antialiasInH));//そもそもレイが放たれている範囲をうっすら色付け
 					maskPic.data[yy][x] = bmpLib::color(0, clamp<int>(sizeIte->second, 0, 255), 0);
 				}
@@ -853,22 +855,30 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				std::make_pair(0.,0.), std::make_pair(0., 15.), std::make_pair(0., 30.), std::make_pair(0., 15.),
 				std::make_pair(0.,0.), std::make_pair(0., -15.), std::make_pair(0., -30.), std::make_pair(0., -15.) */};//Z軸中心の回転角度、Y軸中心の回転角度の順に[deg]で表記する
 
+			if (developperParams::cameraResW != developperParams::cameraResH)throw std::logic_error("");
+			std::uniform_real_distribution<> regularUniform(-1./ (ureal)developperParams::cameraResW, +1. / (ureal)developperParams::cameraResW);//プラマイ1の範囲に限定
 
 			for (size_t ctd = 0; ctd < cameraTransAngleSets.size();ctd++) {
 				developperParams::cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(cameraTransAngleSets.at(ctd).second / 180. * pi, uvec3::UnitY()) * Eigen::AngleAxis<ureal>(cameraTransAngleSets.at(ctd).first / 180. * pi, uvec3::UnitZ()) * Eigen::Translation<ureal, 3>(uvec3(30., 0., 0.)));//カメラの変換をセットする
 				
+				mutexedVariant<developResult> devRez;//デベロップ結果の生画像
+
 				//カメラを生成 アスペクト比は1で固定です　縦横の解像度に関わらず拡がり角は等しくなります
 				std::list<arrow3>cameraRayList;
 				for (size_t y = 0; y < developperParams::cameraResH; y++) {
-					const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));
+					const ureal scy = uleap(PairMinusPlus(1.), y / (ureal)(developperParams::cameraResH - 1));//サブピクセルを加える
 					for (size_t x = 0; x < developperParams::cameraResW; x++) {
 						//スクリーンの位置は((2/res)*i+(1/res))-1 ｽｸﾘｰﾝサイズは多分2*2
-
 						const ureal scx = uleap(PairMinusPlus(1.), x / (ureal)(developperParams::cameraResW - 1));
 						double scz = 1. / tan(developperParams::fovHalf);//視野角を決める事ができる
 
+						//サブピクセルを作る
+						uvec2 subpix(regularUniform(dice), regularUniform(dice));
+						devRez.GetAndLock()->subpix[ivec2(x, y)] = subpix;
+						devRez.unlock();
+
 						//orgが0 wayがスクリーンの正規化
-						Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scx, scy).normalized();
+						Eigen::Vector3d scnormed = Eigen::Vector3d(-scz, scx + subpix.x(), scy + subpix.y()).normalized();
 
 						cameraRayList.push_back(arrow3(developperParams::cameraToGlobal * uvec3(0., 0., 0.), developperParams::cameraToGlobal.rotation() * scnormed));
 						//py::sf("mlab.quiver3d(%f,%f,%f,%f,%f,%f)", cameraRayList.back().org().x(), cameraRayList.back().org().y(), cameraRayList.back().org().z(), cameraRayList.back().dir().x(), cameraRayList.back().dir().y(), cameraRayList.back().dir().z());
@@ -876,7 +886,6 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 					}
 				}
 				
-				mutexedVariant<developResult> devRez;//デベロップ結果の生画像
 				//あるシーンでのカメラ映像をけいさんする関数
 				const auto GetAFrameOfAScene = [&](const size_t rdx, const decltype(finFlagOfEachDevThread)::iterator finflag) {
 					//この計算での//要素レンズ検索の正確さインジゲータ(最初に当たりをつけた部分からどれだけ離れた位置を検索したか)
@@ -957,13 +966,13 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 									//cout << "poskey: " << poskey.x() << "\t" << poskey.y() << endl;
 									const auto& devRezVal = devRez.GetAndLock();
 
-									const auto pixIte = devRezVal->colorList.find(poskey);
-									if (pixIte == devRezVal->colorList.cend())devRezVal->colorList[poskey] = uvec3::Zero();
-									devRezVal->colorList[poskey] += thiscolor.value() / developperParams::subStepRes;//各シーンの色を足し合わせてやればいい
+									const auto pixIte = devRezVal->colorSum.find(poskey);
+									if (pixIte == devRezVal->colorSum.cend())devRezVal->colorSum[poskey] = uvec3::Zero();
+									devRezVal->colorSum[poskey] += thiscolor.value() / developperParams::subStepRes;//各シーンの色を足し合わせてやればいい
 
-									const auto sizIte = devRezVal->colorSiz.find(poskey);//何フレームでゲットできたかをゲット
-									if (sizIte == devRezVal->colorSiz.cend())devRezVal->colorSiz[poskey] = 0;
-									devRezVal->colorSiz[poskey] += 5.;
+									const auto sizIte = devRezVal->colorNum.find(poskey);//何フレームでゲットできたかをゲット
+									if (sizIte == devRezVal->colorNum.cend())devRezVal->colorNum[poskey] = 0;
+									devRezVal->colorNum[poskey] += 5.;
 
 									devRez.unlock();
 								}

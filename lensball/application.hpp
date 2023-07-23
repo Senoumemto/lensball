@@ -353,17 +353,20 @@ namespace cereal
 class developResult {
 
 public:
-	std::unordered_map<ivec2, uvec3> colorList;//カメラの受光素子ごとの色の合計
-	std::unordered_map<ivec2, ureal> colorSiz;//受光素子ごとの入射量
+	std::unordered_map<ivec2, uvec2> subpix;//受光素子のサブピクセル(-1~+1)
+	std::unordered_map<ivec2, uvec3> colorSum;//カメラの受光素子ごとの色の合計
+	std::unordered_map<ivec2, ureal> colorNum;//受光素子ごとの入射量
 
 
 	//シリアライズできるように
 	template<class Archive> void serialize(Archive& archive) const {
-		archive(colorList);
-		archive(colorSiz);
+		archive(subpix);
+		archive(colorSum);
+		archive(colorNum);
 	}
 	template<class Archive> void serialize(Archive& archive) {
-		archive(colorList);
-		archive(colorSiz);
+		archive(subpix);
+		archive(colorSum);
+		archive(colorNum);
 	}
 };
