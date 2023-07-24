@@ -95,8 +95,7 @@ namespace developperParams {
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
-	constexpr size_t antialiasInH = 1;//y方向にこれだけサンプルしてから縮小する
-	constexpr size_t cameraResW = 64, cameraResH = cameraResW* antialiasInH;//あるレイに代表するからね
+	constexpr size_t cameraResW = 1024, cameraResH = cameraResW;//あるレイに代表するからね
 	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
 
 	constexpr size_t subStepRes=10;//より細かくボールを回す
@@ -416,14 +415,15 @@ std::optional<arrow3> GetRefractedRayWithASphericalLensX(const arrow3& targetInB
 //カメラ映像を保存する
 void WriteBmpOfCamera(const developResult& devRez, const std::string& savepath) {
 
+	//まずはイメージを作る
 	bmpLib::img picture;//カメラからの映像
 	picture.width = developperParams::cameraResW;
-	picture.data.resize(developperParams::cameraResH / developperParams::antialiasInH);
-	picture.height = developperParams::cameraResH / developperParams::antialiasInH;
+	picture.data.resize(developperParams::cameraResH);
+	picture.height = developperParams::cameraResH;
 	bmpLib::img maskPic;//どこに値が存在するか
 	maskPic.width = developperParams::cameraResW;
-	maskPic.data.resize(developperParams::cameraResH / developperParams::antialiasInH);
-	maskPic.height = developperParams::cameraResH / developperParams::antialiasInH;
+	maskPic.data.resize(developperParams::cameraResH);
+	maskPic.height = developperParams::cameraResH;
 	for (int yy = 0; yy < picture.height; yy++) {
 		picture.data.at(yy).resize(developperParams::cameraResW);
 		maskPic.data.at(yy).resize(developperParams::cameraResW);
@@ -431,14 +431,34 @@ void WriteBmpOfCamera(const developResult& devRez, const std::string& savepath) 
 			//まず対象の位置を初期化して
 			picture.data[yy][x] = bmpLib::color(0, 0, 0);
 			maskPic.data[yy][x] = bmpLib::color(0, 0, 0);
-			for (int a = 0; a < developperParams::antialiasInH; a++) {
-				const auto pixIte = devRez.colorSum.find(ivec2(x, yy * developperParams::antialiasInH + a));
-				const auto sizeIte = devRez.colorNum.find(ivec2(x, yy * developperParams::antialiasInH + a));//対応したピクセルを設置
-				if (pixIte != devRez.colorSum.cend()) {//ちゃんと色があれば
-					picture.data[yy][x] += bmpLib::color(pixIte->second.x() * (developperParams::brightnessCoef / developperParams::antialiasInH), pixIte->second.y() * (developperParams::brightnessCoef / developperParams::antialiasInH), pixIte->second.z() * (developperParams::brightnessCoef / developperParams::antialiasInH));//そもそもレイが放たれている範囲をうっすら色付け
-					maskPic.data[yy][x] = bmpLib::color(0, clamp<int>(sizeIte->second, 0, 255), 0);
+		}
+	}
+
+	//キーを走査する
+	for (int yy = 0; yy < picture.height; yy++) {
+		for (int x = 0; x < picture.width; x++) {
+			const ivec2 key(x, yy);
+			//検索
+			const auto& subIte = devRez.subpix.find(key);
+			const auto& pixIte = devRez.colorSum.find(key);
+			const auto& sizeIte = devRez.colorNum.find(key);//対応したピクセルを設置
+
+			//9のピクセルに影響する
+			for(int sy=0;sy<3;sy++)
+				for (int sx = 0; sx < 3; sx++) {
+					const ivec2 nowpixRer(sx - 1, sy - 1);
+					const ivec2 nowpix = key + nowpixRer;
+					//なければ無視
+					if (nowpix.x() < 0 || nowpix.x() >= developperParams::cameraResW)continue;
+					if (nowpix.y() < 0 || nowpix.y() >= developperParams::cameraResH)continue;
+
+					//x,yごとの差を求める
+					const uvec2 dist = subIte->second - uvec2(sx - 1, sy - 1);
+					const ureal weight = max(1. - fabs(dist.x()), 0.) * max(1. - fabs(dist.y()), 0.);
+
+					picture.data[yy+ nowpixRer.y()][x+nowpixRer.x()] += bmpLib::color(pixIte->second.x() * developperParams::brightnessCoef * weight, pixIte->second.y() * developperParams::brightnessCoef * weight, pixIte->second.z() * developperParams::brightnessCoef * weight);//そもそもレイが放たれている範囲をうっすら色付け
+					maskPic.data[yy + nowpixRer.y()][x + nowpixRer.x()] = bmpLib::color(0, clamp<int>(sizeIte->second*weight, 0, 255), 0);
 				}
-			}
 		}
 	}
 
