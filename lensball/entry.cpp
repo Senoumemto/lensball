@@ -536,7 +536,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		//Pythonをセットアップしてからレンズボールの概形を書く
-		constexpr bool drawSphere = false;//レンズボール概形を描画する
+		constexpr bool drawSphere = true;//レンズボール概形を描画する
 		constexpr bool drawAparture = false;//アパーチャを描画する
 		{
 
@@ -652,7 +652,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//スキャンをする
-		constexpr bool scanLenses = false;//レンズボールに対するレイトレーシングを行う
+		constexpr bool scanLenses = true;//レンズボールに対するレイトレーシングを行う
 		constexpr bool drawRefractionDirectionOfARay = false;//あるレイの屈折方向を描画する
 		constexpr bool logWarningInScan = false;//scan中の警告を表示する
 		if (scanLenses) {
@@ -738,6 +738,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 								//結果を追加
 								rezMem.push_back(refractRayDirInGlobal);
 
+								if(vpd%100==0&& hpd%100==0)PlotRayInMlab(refractRayDirInGlobal, "tube_radius = 0.01, color=(1,0,0)");
+
 								////プロットします　ヒットポイントに
 								//if (vpd == 0 && drawRefractionDirectionOfARay) {
 								//	const auto color = HsvToRgb({ rd / (ureal)(hardwareParams::numOfProjectionPerACycle - 1),1.,1. });
@@ -750,7 +752,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 				}
 
 				//スキャンが終わったらセーブ
-				TransRezToStorage(rezMem, storageStream);
+				//TransRezToStorage(rezMem, storageStream);
 				//一応worthも更新
 				searchAccuracyOfTheScanX.GetAndLock()->UpdateThisToWorth(searchAccuracyOfTheScene);
 				searchAccuracyOfTheScanX.unlock();
@@ -760,6 +762,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 			//複数スレッドに回転角度を変えながら割り当てる
 			for (std::decay<decltype(hardwareParams::numOfProjectionPerACycle)>::type rdgen = 0; rdgen < hardwareParams::numOfProjectionPerACycle; rdgen++) {
+				if (rdgen % 50 != 0)continue;
 				std::cout << "count: " << rdgen << endl;
 				//このrdgenでの処理を開いているスレッドに割り付けたい
 				bool isfound = false;
@@ -845,7 +848,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//デベロップセクション
-		constexpr bool developImage = true;
+		constexpr bool developImage = false;
 		constexpr bool printMessagesInDevelopping = developImage && false;//デベロップ中のメッセージを出力するか
 		if (developImage) {
 			projRefraDicHeader header;
