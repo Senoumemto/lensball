@@ -562,6 +562,25 @@ spz = np.cos(sphtheta)
 mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(1.,1.,1.) )  
 )", sphereResolution, sphereResolution, lensballDesignParams::sphereRadiusInner, lensballDesignParams::sphereRadiusInner, lensballDesignParams::sphereRadiusInner);
 
+			py::s(R"(
+def draw_cylinder(center = (0, 0, 0), radius = 1.0, height = 2.0, resolution = 100) :
+	# Generate points for the base circle of the cylinder
+	theta = np.linspace(0, 2 * np.pi, resolution)
+	x = center[0] + radius * np.cos(theta)
+	y = center[1] + radius * np.sin(theta)
+	z_bottom = center[2] - height / 2
+	z_top = center[2] + height / 2
+
+	# Create the surface plot for the bottomand top circles
+	mlab.plot3d(x, y, z_bottom * np.ones_like(x), tube_radius = None, color = (0.8, 0.8, 0.8))
+	mlab.plot3d(x, y, z_top * np.ones_like(x), tube_radius = None, color = (0.8, 0.8, 0.8))
+
+	# Connect the circles to create the cylinder walls
+	for i in range(resolution) :
+		mlab.plot3d([x[i], x[i]], [y[i], y[i]], [z_bottom, z_top], tube_radius = None, color = (0.2, 0.2, 0.2))
+
+draw_cylinder(center=(0, 0, 0), radius=0.1, height=4.0, resolution=200)
+			)");
 			//アパーチャを球で近似して描画する
 			if (drawAparture)py::sf(R"(
 [sphphi,sphtheta] = np.mgrid[0:2*np.pi:%dj,0:np.pi:%dj]
@@ -762,7 +781,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 			//複数スレッドに回転角度を変えながら割り当てる
 			for (std::decay<decltype(hardwareParams::numOfProjectionPerACycle)>::type rdgen = 0; rdgen < hardwareParams::numOfProjectionPerACycle; rdgen++) {
-				if (rdgen % 50 != 0)continue;
+				if (rdgen % 125 != 0)continue;
 				std::cout << "count: " << rdgen << endl;
 				//このrdgenでの処理を開いているスレッドに割り付けたい
 				bool isfound = false;
