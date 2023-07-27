@@ -95,10 +95,10 @@ namespace developperParams {
 
 	//現像に使うカメラ
 	constexpr ureal fovHalf = 1.5 / 180. * pi;
-	constexpr size_t cameraResW = 2048, cameraResH = cameraResW;//あるレイに代表するからね
+	constexpr size_t cameraResW = 1024, cameraResH = cameraResW;//あるレイに代表するからね
 	constexpr ureal brightnessCoef = 3.;//明るさ係数　これだけ明るくなる
 
-	constexpr size_t subStepRes=1;//より細かくボールを回す
+	constexpr size_t subStepRes=10;//より細かくボールを回す
 
 	auto cameraToGlobal = Eigen::Affine3d(Eigen::AngleAxis<ureal>(0. / 180. * pi, uvec3::UnitY())*Eigen::AngleAxis<ureal>(0./180.*pi ,uvec3::UnitZ())* Eigen::Translation<ureal, 3>(uvec3(30.,0.,0.)));//カメラの変換 カメラは-xを視線方向 zを上方向にする
 };
@@ -870,8 +870,8 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 			//カメラの変換を変えながらレンダリングする
 			std::vector<std::pair<ureal, ureal>> cameraTransAngleSets = {
-				std::make_pair(-30.,+30.), std::make_pair(0.,+30.), std::make_pair(+30.,+30.),
-				std::make_pair(-30.,0.), std::make_pair(0.,0.), std::make_pair(+30.,0.),
+				/*std::make_pair(-30.,+30.), std::make_pair(0.,+30.), std::make_pair(+30.,+30.),
+				std::make_pair(-30.,0.), std::make_pair(0.,0.), */std::make_pair(+30.,0.),
 				std::make_pair(-30.,-30.), std::make_pair(0.,-30.), std::make_pair(+30.,-30.)};//Z軸中心の回転角度、Y軸中心の回転角度の順に[deg]で表記する
 
 			if (developperParams::cameraResW != developperParams::cameraResH)throw std::logic_error("");
