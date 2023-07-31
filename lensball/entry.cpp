@@ -448,19 +448,35 @@ void WriteBmpOfCamera(const developResult& devRez, const std::string& savepath) 
 				for (int sx = 0; sx < 3; sx++) {
 					const ivec2 nowpixRer(sx - 1, sy - 1);
 					const ivec2 nowpix = key + nowpixRer;
-					//なければ無視
+					//枠外ならば無視
 					if (nowpix.x() < 0 || nowpix.x() >= developperParams::cameraResW)continue;
 					if (nowpix.y() < 0 || nowpix.y() >= developperParams::cameraResH)continue;
 
+					//ピクセルがなくても無視
+					if (pixIte == devRez.colorSum.end())continue;
+
 					//x,yごとの差を求める
 					const uvec2 dist = subIte->second - uvec2(sx - 1, sy - 1);
-					const ureal weight = max(1. - fabs(dist.x()), 0.) * max(1. - fabs(dist.y()), 0.);
+					const ureal weight = 1.;
 
 					picture.data[yy+ nowpixRer.y()][x+nowpixRer.x()] += bmpLib::color(pixIte->second.x() * developperParams::brightnessCoef * weight, pixIte->second.y() * developperParams::brightnessCoef * weight, pixIte->second.z() * developperParams::brightnessCoef * weight);//そもそもレイが放たれている範囲をうっすら色付け
 					maskPic.data[yy + nowpixRer.y()][x + nowpixRer.x()] += bmpLib::color(0, clamp<int>(sizeIte->second*weight, 0, 255), 0);
 				}
 		}
 	}
+
+	/*//マスクが0のところを消す
+	for (int yy = 0; yy < picture.height; yy++) {
+		for (int x = 0; x < picture.width; x++) {
+			const ivec2 key(x, yy);
+
+			const auto& pixIte = devRez.colorSum.find(key);
+			const auto& sizeIte = devRez.colorNum.find(key);//対応したピクセルを設置
+
+			if (maskPic.data[yy][x].g == 0)picture.data[yy][x] = bmpLib::color(0,0,0);
+		}
+	}
+	*/
 
 	bmpLib::WriteBmp((savepath+".bmp").c_str(), &picture);
 	bmpLib::WriteBmp((savepath+".mask.bmp").c_str(), &maskPic);
@@ -845,7 +861,7 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 
 		//デベロップセクション
-		constexpr bool developImage = true;
+		constexpr bool developImage = false;
 		constexpr bool printMessagesInDevelopping = developImage && false;//デベロップ中のメッセージを出力するか
 		if (developImage) {
 			projRefraDicHeader header;
@@ -1097,3 +1113,20 @@ mlab.mesh(%f*spx, %f*spy, %f*spz ,color=(0.,1.,0.) )
 
 	return 0;
 }
+
+
+/*int devToBmpMain() {
+	const string pathprefix = R"(C:\local\user\lensball\lensball\rez\ExLens\list\)";
+	for(int i = 0; i < 9; i++) {
+		const string path = pathprefix + to_string(i) + ".devrez";
+		developResult devRezVal;
+		//Rowファイルとして保存する
+		{
+			ifstream ifs(path, std::ios::binary);
+			cereal::BinaryInputArchive bin(ifs);
+			bin(devRezVal);
+		}
+		//映像をBMPとして書き出す
+		WriteBmpOfCamera(devRezVal, pathprefix+to_string(i)+"hell.png");
+	}
+}*/

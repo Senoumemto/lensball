@@ -32,9 +32,9 @@ namespace bmpLib {
 
 		//‘«‚µ‚Ü‚·
 		color& operator+=(const color& b) {
-			this->r += b.r;
-			this->g += b.g;
-			this->b += b.b;
+			this->r = std::min(this->r + b.r, 255);
+			this->g = std::min(this->g + b.g, 255);
+			this->b = std::min(this->b + b.b, 255);
 
 			return *this;
 		}
