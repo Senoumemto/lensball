@@ -13,6 +13,8 @@
 #include <vector>
 #include <iostream>
 #include <memory>
+#include <thread>
+#include <queue>
 namespace detail
 {
     /* C++ 17版 */
@@ -64,6 +66,96 @@ std::string StringFormat(const std::string& format, Args&& ... args)
     return detail::StringFormatInternal(format, detail::Convert(std::forward<Args>(args)) ...);
 }
 
+//スレッドセーブなキューhttps://suikaba.hatenablog.com/entry/2018/03/30/180839
+namespace safe_queue {
+    class empty_queue : std::exception {
+    public:
+        const char* what() const throw() {
+            return "Empty queue";
+        }
+    };
+
+    template <typename T>
+    class safe_queue {
+    public:
+        safe_queue() {}
+        safe_queue(safe_queue const& other) {
+            std::lock_guard<std::mutex> lock(other.m);
+            que = other.que;
+        }
+        safe_queue& operator=(safe_queue const&) = delete;
+
+        void push(T value) {
+            std::lock_guard<std::mutex> lock(m);
+            que.push(value);
+        }
+
+        void pop(T& res) {
+            std::lock_guard<std::mutex> lock(m);
+            if (que.empty()) throw empty_queue();
+            res = que.front();
+            que.pop();
+        }
+        std::shared_ptr<T> pop() {
+            std::lock_guard<std::mutex> lock(m);
+            if (que.empty()) throw empty_queue();
+            auto const res = std::make_shared<T>(que.front());
+            que.pop();
+            return res;
+        }
+
+        bool empty() const {
+            std::lock_guard<std::mutex> lock(m);
+            return que.empty();
+        }
+
+        size_t size() const {
+            std::lock_guard<std::mutex> lock(m);
+            return que.size();
+        }
+
+    private:
+        std::queue<T> que;
+        mutable std::mutex m;
+    };
+};
+
+class pythonRuntime {
+private:
+    //シングルトンのために
+    pythonRuntime() = delete;
+    pythonRuntime(const pythonRuntime&) = delete;
+    pythonRuntime& operator=(const pythonRuntime&) = delete;
+
+protected:
+    //ここでバッファリングする
+    static safe_queue::safe_queue<std::string> combuffer;
+    //コマンド処理スレッド
+    static uptr<std::thread> pyRunThread;
+    //継続フラグ
+    static std::atomic_bool FlagContiPyRun;
+public:
+
+    //コマンド処理スレッド内で実行されるループ
+    static void PyRunLoop();
+
+    static void Init();
+    static void Terminate();
+
+    //コマンドを送信する
+    static void SendCommand(const std::string& command);
+    static void s(const std::string& s);
+
+    //フォーマットコマンドを送信する
+    template<typename ... Args>static void SendCommandFormat(const std::string& format, Args&& ... args) {
+        SendCommand(StringFormat(format, args...));
+    }
+
+    template<typename ... Args>static void sf(const std::string& format, Args&& ... args) {
+        SendCommandFormat(format, args...);
+    }
+};
+
 class matplotlib {
 
 public:
@@ -93,13 +185,20 @@ public:
         line(uvec2(b.x(), b.y()), uvec2(e.x(), e.y()), color);
     }
 
+
 	void save(const char* filename) const {
-		send_command(StringFormat("\n", filename).c_str());
+		send_command(StringFormat("plt.savefig(\"%s\")\n", filename).c_str());
 	}
+    void save(const std::string& filename) const {
+        this->save(filename.c_str());
+    }
 
 	void send_command(const char* s) const {
 		PyRun_SimpleString(s);
 	}
+    void send_command(const std::string& s) const {
+        this->send_command(s.c_str());
+    }
     void send_import(const char* s) const {
         PyImport_AddModule(s);
     }

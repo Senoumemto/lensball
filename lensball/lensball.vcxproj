@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\local\dev\eigen-3.4.0;C:\local\dev\pybind11-2.10.2\include;C:\Users\enlab\AppData\Local\Programs\Python\Python311\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\local\dev\cereal-1.3.2\include;C:\local\dev\eigen-3.4.0;C:\local\dev\pybind11-2.10.2\include;C:\Users\enlab\AppData\Local\Programs\Python\Python311\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -123,7 +123,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\local\dev\eigen-3.4.0;C:\local\dev\pybind11-2.10.2\include;C:\Users\enlab\AppData\Local\Programs\Python\Python311\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\local\dev\cereal-1.3.2\include;C:\local\dev\eigen-3.4.0;C:\local\dev\pybind11-2.10.2\include;C:\Users\enlab\AppData\Local\Programs\Python\Python311\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -137,13 +137,30 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="bmpLib\bmp.cpp" />
     <ClCompile Include="entry.cpp" />
     <ClCompile Include="application.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="application.hpp" />
+    <ClInclude Include="bmpLib\bmp.hpp" />
     <ClInclude Include="general.hpp" />
     <ClInclude Include="matplotwrapper.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="results\rez0.png" />
+    <Image Include="results\rez1.png" />
+    <Image Include="results\rez2.png" />
+    <Image Include="results\rez3.png" />
+    <Image Include="results\rez4.png" />
+    <Image Include="results\rez5.png" />
+    <Image Include="results\rez6.png" />
+    <Image Include="results\rez7.png" />
+    <Image Include="results\rez8.png" />
+    <Image Include="results\rez9.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="lensball.context" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

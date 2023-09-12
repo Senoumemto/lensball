@@ -1,0 +1,12 @@
+{
+    "mypc": {
+        "version": 1,
+        "threadNumMax": 18,
+        "rezpath": "C:\\local\\user\\lensball\\lensball\\rez\\",
+        "defaultArg": [
+            "first",
+            "second",
+            "third"
+        ]
+    }
+}

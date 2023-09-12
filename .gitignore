@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/lensball/results/*
+/lensball/results2/*
+/lensball/results3/*
+/lensball/resultsX/*
+/lensball/.oldRezes
+/lensball/results2
+/lensball/rez/SimVis
+/lensball/rez/*

@@ -21,6 +21,9 @@
     <ClCompile Include="application.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="bmpLib\bmp.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="matplotwrapper.hpp">
@@ -32,5 +35,43 @@
     <ClInclude Include="application.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="bmpLib\bmp.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="results\rez0.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez1.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez2.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez3.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez4.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez5.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez6.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez7.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez8.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="results\rez9.png">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="lensball.context" />
   </ItemGroup>
 </Project>

@@ -37,6 +37,8 @@ using uvec2 = Eigen::Vector<ureal, 2>;
 using uvec3 = Eigen::Vector<ureal, 3>;
 using uvec4 = Eigen::Vector<ureal, 4>;
 
+
+using umat2 = Eigen::Matrix2<ureal>;
 using umat3 = Eigen::Matrix3<ureal>;
 using umat4 = Eigen::Matrix4<ureal>;
 
@@ -48,6 +50,7 @@ using uaffine3 = Eigen::Transform<ureal, 3, 2>;
 template<typename T>using sptr = std::shared_ptr<T>;
 template<typename T>using uptr = std::unique_ptr<T>;
 
+using ivec2 = Eigen::Vector2i;
 
 //二次元一般化座標 x座標,y座標 theta姿勢 1
 using up2d = uvec4;
@@ -110,6 +113,12 @@ template<typename T>uvec2 ReshapeXY(const T& gen) {
 	return uvec2(gen.x(), gen.y());
 }
 
+//線形補間する
+template<typename T>T uleap(const std::pair<T,T>& range,const T& t) {
+	return range.first + (range.second - range.first) * t;
+}
+
+
 
 namespace std {
 	template <typename Scalar, int Rows, int Cols>
@@ -167,5 +176,41 @@ namespace std {
 
 };
 #endif
+
+//なんかセクションから抜けるときに使う例外　とくにエラーではない
+class escapeException :public std::exception {
+
+};
+
+
+template < typename T > constexpr T sqrt_constexpr(T s) {
+	T x = s / 2.0;
+	T prev = 0.0;
+
+	while (x != prev)
+	{
+		prev = x;
+		x = (x + s / x) / 2.0;
+	}
+	return x;
+}
+
+//この変数を使うときに必ずmutexをロックするようになる 所有権もこいつが持ってるよ
+template<typename VAL>class mutexedVariant :public std::mutex {
+private:
+	using super = std::mutex;
+	std::unique_ptr<VAL> val;
+public:
+	mutexedVariant() :super(), val(new VAL){}
+	mutexedVariant(const VAL&& v) :super() {
+		val = make_unique(v);
+	}
+
+	std::unique_ptr<VAL>& GetAndLock() {
+		this->lock();
+
+		return val;
+	}
+};
 
 #endif
